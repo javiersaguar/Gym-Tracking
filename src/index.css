@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    /* El gimnasio se usa con una mano y con prisa: nada de rebotes raros ni
+       de zoom accidental al pulsar dos veces en un stepper. */
+    touch-action: manipulation;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-content font-sans antialiased;
+    font-feature-settings: 'cv05' 1, 'ss03' 1, 'tnum' 0;
+    /* `viewport-fit: cover` estira la página bajo la isla dinámica; el
+       contenido tiene que respetar las muescas laterales. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    overscroll-behavior-y: none;
+  }
+
+  /* Ambiente: dos luces azules muy tenues que dan profundidad al negro sin
+     ensuciarlo. Fijas, para que no se muevan con el scroll. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(1100px 520px at 50% -18%, rgba(46, 123, 255, 0.13), transparent 62%),
+      radial-gradient(760px 420px at 100% 8%, rgba(127, 216, 255, 0.06), transparent 58%),
+      radial-gradient(680px 400px at 0% 34%, rgba(107, 166, 255, 0.045), transparent 60%);
+  }
+
+  /* Grano finísimo: quita el aspecto plano de los degradados. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.3;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tightest text-white;
+  }
+
+  ::selection {
+    @apply bg-brand text-white;
+  }
+
+  /* Cifras siempre tabulares: una columna de kilos no puede bailar al pasar
+     de 9 a 10. */
+  .tnum,
+  input[inputmode='decimal'],
+  input[inputmode='numeric'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Las flechitas del input numérico no sirven de nada en un móvil y roban
+     ancho al número. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* Superficie base de tarjeta: un borde de un píxel y una luz superior que
+     simula el canto de un material real. */
+  .card {
+    @apply rounded-2xl border border-line bg-surface/80 shadow-card backdrop-blur-xl;
+  }
+
+  /* Barras flotantes: material translúcido con el contenido pasando por
+     debajo, no una franja opaca que se come la pantalla. */
+  .chrome {
+    background: rgba(8, 11, 18, 0.72);
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+  }
+
+  /* El cronómetro se apoya sobre tarjetas llenas de cifras, y ahí el cristal
+     fino deja que se lea el fondo a través del número. Más cuerpo: sigue
+     siendo material, pero manda él. */
+  .chrome-solid {
+    /* Opaco del todo. Con un 4 % de transparencia todavía se leían los
+       kilos de la tarjeta de debajo por detrás de la cifra del cronómetro,
+       y esta barra es justo la que hay que poder mirar de reojo. */
+    background: #080b12;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* Realce interactivo: se pinta en pointer-down, nunca al soltar. */
+  .pressable {
+    @apply transition-transform duration-press ease-out;
+  }
+  .pressable:active {
+    transform: scale(0.97);
+  }
+
+  .hairline {
+    @apply border-t border-line;
+  }
+}
+
+@layer utilities {
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0.5rem);
+  }
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+/* Movimiento reducido: se conservan los cambios de opacidad, que ayudan a
+   entender qué ha cambiado, y se quitan los desplazamientos. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Sin transparencias: se sustituye el cristal por superficie sólida antes de
+   que la legibilidad se venga abajo. */
+@media (prefers-reduced-transparency: reduce) {
+  .chrome,
+  .chrome-solid {
+    background: #080b12;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .card {
+    @apply bg-surface backdrop-blur-none;
+  }
+}

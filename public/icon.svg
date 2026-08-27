@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Gym Tracking">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0D1420"/>
+      <stop offset="100%" stop-color="#05070C"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6BA6FF"/>
+      <stop offset="55%" stop-color="#2E7BFF"/>
+      <stop offset="100%" stop-color="#1550C8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="114" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="511" height="511" rx="113.5" fill="none" stroke="rgba(255,255,255,.09)"/>
+  <circle cx="256" cy="150" r="210" fill="#2E7BFF" opacity=".10"/>
+
+  <!-- Barra: discos blancos por fuera, azules por dentro, eje en degradado. -->
+  <g>
+    <rect x="96" y="243" width="320" height="26" rx="13" fill="url(#bar)"/>
+    <rect x="60" y="203" width="40" height="106" rx="18" fill="#FFFFFF"/>
+    <rect x="412" y="203" width="40" height="106" rx="18" fill="#FFFFFF"/>
+    <rect x="108" y="178" width="46" height="156" rx="21" fill="#FFFFFF"/>
+    <rect x="358" y="178" width="46" height="156" rx="21" fill="#FFFFFF"/>
+    <rect x="164" y="211" width="34" height="90" rx="16" fill="#6BA6FF"/>
+    <rect x="314" y="211" width="34" height="90" rx="16" fill="#6BA6FF"/>
+  </g>
+</svg>
