@@ -2,21 +2,23 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { RestTimer } from '../components/RestTimer';
-import { Button, Card, Sheet, cx } from '../components/ui';
+import { Button, Card, Scale, Sheet } from '../components/ui';
 import { addExerciseToSession, completeSet, discardSession, finishSession } from '../lib/actions';
-import { clock, duration } from '../lib/format';
+import { clock, duration, plural } from '../lib/format';
 import { haptic, useKeepAwake, useRestTimer, useTick } from '../lib/hooks';
 import { personalBests } from '../lib/metrics';
 import { referenceFor } from '../lib/reference';
 import { CATALOG_IDS, catalogName } from '../lib/routine';
 import type { Session, Store } from '../lib/types';
 
+/* Escala ordinal, sin caritas: en una interfaz de datos los emojis leen como
+   decoración y el orden se entiende mejor si lo dibuja el propio control. */
 const FEELINGS = [
-  { value: 1, label: 'Fatal', emoji: '😵' },
-  { value: 2, label: 'Flojo', emoji: '😕' },
-  { value: 3, label: 'Normal', emoji: '🙂' },
-  { value: 4, label: 'Bien', emoji: '💪' },
-  { value: 5, label: 'Brutal', emoji: '🔥' },
+  { value: 1, label: 'Fatal' },
+  { value: 2, label: 'Flojo' },
+  { value: 3, label: 'Normal' },
+  { value: 4, label: 'Bien' },
+  { value: 5, label: 'Brutal' },
 ];
 
 export function Entreno({
@@ -85,30 +87,30 @@ export function Entreno({
     <div className="pb-56">
       {/* Cabecera pegajosa: el reloj y el avance son lo único que hay que
           tener siempre a la vista. */}
-      <div className="chrome safe-top sticky top-0 z-30 -mx-4 mb-4 border-b border-line px-4 pb-2.5">
-        <div className="flex items-center gap-3">
+      <div className="chrome safe-top sticky top-0 z-30 -mx-6 mb-5 border-b border-line px-6 pb-2.5">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             onClick={onExit}
             aria-label="Volver"
-            className="pressable -ml-1.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-content-muted hover:bg-white/6 hover:text-content"
+            className="pressable -ml-2 grid h-9 w-9 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-sunken hover:text-ink"
           >
-            <svg viewBox="0 0 20 20" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 4.5L6.5 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <path d="M11.5 4.5L6 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-title font-semibold">{active.dayName}</h1>
-            <p className="tnum text-micro text-content-faint">
+            <h1 className="truncate text-title font-medium">{active.dayName}</h1>
+            <p className="tnum text-micro text-ink-faint">
               {clock(elapsed)} · {live.done}/{live.total} series
             </p>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => setClosing(true)}>
+          <Button size="sm" variant="outline" onClick={() => setClosing(true)}>
             Terminar
           </Button>
         </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="mx-auto mt-2 h-[3px] max-w-lg overflow-hidden rounded-full bg-line-soft">
           <motion.span
-            className="block h-full rounded-full bg-brand"
+            className="block h-full rounded-full bg-accent"
             initial={false}
             animate={{ width: `${live.pct}%` }}
             transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
@@ -129,7 +131,7 @@ export function Entreno({
           />
         ))}
 
-        <Button variant="quiet" block onClick={() => setAdding(true)} className="border border-dashed border-line py-6">
+        <Button variant="quiet" block onClick={() => setAdding(true)} className="h-auto border border-dashed border-line py-5 text-ink-faint hover:text-ink">
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
           </svg>
@@ -138,14 +140,14 @@ export function Entreno({
 
         <button
           onClick={() => setConfirmDiscard(true)}
-          className="w-full py-3 text-center text-micro font-medium text-content-faint transition-colors hover:text-danger"
+          className="w-full py-3 text-center text-micro text-ink-faint transition-colors hover:text-bad-ink"
         >
           Descartar este entreno
         </button>
       </div>
 
       {/* Cronómetro y cierre, flotando por encima del contenido. */}
-      <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 mx-auto max-w-lg px-4 pb-2">
+      <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 mx-auto max-w-lg px-4 pb-3">
         <RestTimer
           timer={timer}
           contextLabel={nextUp ? `Luego: ${nextUp.name} · serie ${nextUp.setNumber}` : 'Última serie del entreno'}
@@ -162,7 +164,7 @@ export function Entreno({
         title="Cerrar el entreno"
         footer={
           <div className="flex gap-2 pb-1">
-            <Button variant="ghost" block onClick={() => setClosing(false)}>
+            <Button variant="outline" block onClick={() => setClosing(false)}>
               Seguir
             </Button>
             <Button
@@ -182,51 +184,32 @@ export function Entreno({
         }
       >
         <div className="space-y-4 pb-2">
-          <Card className="grid grid-cols-3 gap-3 p-3.5">
+          <Card className="grid grid-cols-3 gap-4 p-5">
             <div>
-              <p className="text-micro uppercase tracking-[0.08em] text-content-faint">Duración</p>
-              <p className="tnum mt-0.5 text-title font-semibold text-white">{duration(elapsed)}</p>
+              <p className="label">Duración</p>
+              <p className="tnum mt-1.5 text-figure font-medium">{duration(elapsed)}</p>
             </div>
             <div>
-              <p className="text-micro uppercase tracking-[0.08em] text-content-faint">Series</p>
-              <p className="tnum mt-0.5 text-title font-semibold text-white">
+              <p className="label">Series</p>
+              <p className="tnum mt-1.5 text-figure font-medium">
                 {live.done}
-                <span className="text-caption text-content-faint">/{live.total}</span>
+                <span className="text-caption text-ink-faint">/{live.total}</span>
               </p>
             </div>
             <div>
-              <p className="text-micro uppercase tracking-[0.08em] text-content-faint">Descanso medio</p>
-              <p className="tnum mt-0.5 text-title font-semibold text-white">{avgRestLabel(active)}</p>
+              <p className="label">Descanso medio</p>
+              <p className="tnum mt-1.5 text-figure font-medium">{avgRestLabel(active)}</p>
             </div>
           </Card>
 
           <div>
-            <p className="mb-2 text-caption font-medium text-content">¿Cómo ha ido?</p>
-            <div className="flex gap-1.5">
-              {FEELINGS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => {
-                    haptic(8);
-                    setFeel(f.value);
-                  }}
-                  className={cx(
-                    'pressable flex flex-1 flex-col items-center gap-1 rounded-xl border py-2.5 transition-colors duration-press',
-                    feel === f.value ? 'border-brand/45 bg-brand/12' : 'border-line bg-surface-sunken/60 hover:border-line-strong',
-                  )}
-                >
-                  <span className="text-body-lg">{f.emoji}</span>
-                  <span className={cx('text-micro font-semibold', feel === f.value ? 'text-brand-bright' : 'text-content-faint')}>
-                    {f.label}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <p className="mb-2.5 text-caption font-medium text-ink">¿Cómo ha ido?</p>
+            <Scale options={FEELINGS} value={feel} onChange={setFeel} />
           </div>
 
           <div>
-            <label htmlFor="nota" className="mb-1.5 block text-caption font-medium text-content">
-              Nota <span className="text-content-faint">(opcional)</span>
+            <label htmlFor="nota" className="mb-1.5 block text-caption font-medium text-ink">
+              Nota <span className="font-normal text-ink-faint">(opcional)</span>
             </label>
             <textarea
               id="nota"
@@ -234,24 +217,25 @@ export function Entreno({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Molestia en el hombro, mucha cola en la prensa…"
-              className="w-full resize-none rounded-xl border border-line bg-surface-sunken px-3.5 py-2.5 text-body text-content outline-none transition duration-200 placeholder:text-content-faint focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
+              className="w-full resize-none rounded-lg border border-line bg-paper px-3.5 py-2.5 text-body text-ink outline-none transition duration-200 placeholder:text-ink-faint/70 focus:border-accent/50 focus:ring-4 focus:ring-accent/12"
             />
           </div>
 
           {live.done < live.total && (
-            <p className="text-caption text-content-muted">
-              Quedan {live.total - live.done} series sin marcar. No se guardan: el análisis solo cuenta lo hecho.
+            <p className="text-caption text-ink-muted">
+              Quedan {plural(live.total - live.done, 'serie')} sin marcar. No se guardan: el análisis solo cuenta lo
+              hecho.
             </p>
           )}
         </div>
       </Sheet>
 
       <Sheet open={confirmDiscard} onClose={() => setConfirmDiscard(false)} title="Descartar el entreno">
-        <p className="pb-4 text-body text-content-muted">
+        <p className="pb-4 text-body text-ink-muted">
           Se borra todo lo apuntado en esta sesión y no se puede recuperar.
         </p>
         <div className="flex gap-2 pb-4">
-          <Button variant="ghost" block onClick={() => setConfirmDiscard(false)}>
+          <Button variant="outline" block onClick={() => setConfirmDiscard(false)}>
             Cancelar
           </Button>
           <Button
@@ -293,14 +277,14 @@ function AddExerciseSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
   return (
     <Sheet open={open} onClose={onClose} title="Añadir ejercicio">
-      <p className="pb-3 text-caption text-content-muted">Solo para el entreno de hoy. La rutina no se toca.</p>
+      <p className="pb-4 text-caption text-ink-muted">Solo para el entreno de hoy. La rutina no se toca.</p>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar…"
-        className="mb-3 w-full rounded-xl border border-line bg-surface-sunken px-3.5 py-2.5 text-body text-content outline-none transition duration-200 placeholder:text-content-faint focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
+        className="mb-3 w-full rounded-lg border border-line bg-paper px-3.5 py-2.5 text-body text-ink outline-none transition duration-200 placeholder:text-ink-faint/70 focus:border-accent/50 focus:ring-4 focus:ring-accent/12"
       />
-      <ul className="space-y-1 pb-4">
+      <ul className="border-t border-line pb-4">
         <AnimatePresence initial={false}>
           {list.map((x) => (
             <motion.li key={x.id} layout="position" exit={{ opacity: 0 }}>
@@ -310,17 +294,17 @@ function AddExerciseSheet({ open, onClose }: { open: boolean; onClose: () => voi
                   addExerciseToSession(x.id, 2);
                   onClose();
                 }}
-                className="pressable flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface-sunken/60 px-3.5 py-3 text-left transition-colors duration-press hover:border-line-strong"
+                className="flex w-full items-center justify-between gap-3 border-b border-line py-3.5 text-left transition-colors duration-press hover:bg-canvas"
               >
-                <span className="truncate text-body font-medium text-content">{x.name}</span>
-                <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-content-faint" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
+                <span className="truncate text-body text-ink">{x.name}</span>
+                <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M10 4.8v10.4M4.8 10h10.4" strokeLinecap="round" />
                 </svg>
               </button>
             </motion.li>
           ))}
         </AnimatePresence>
-        {!list.length && <li className="py-6 text-center text-caption text-content-faint">Nada con ese nombre.</li>}
+        {!list.length && <li className="py-8 text-caption text-ink-faint">Nada con ese nombre.</li>}
       </ul>
     </Sheet>
   );

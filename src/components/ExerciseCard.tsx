@@ -19,10 +19,10 @@ function DoneButton({ done, onToggle }: { done: boolean; onToggle: () => void })
       aria-label={done ? 'Deshacer serie' : 'Marcar serie'}
       aria-pressed={done}
       className={cx(
-        'pressable grid h-12 w-12 shrink-0 place-items-center rounded-xl border transition-colors duration-press',
+        'pressable grid h-12 w-12 shrink-0 place-items-center rounded-lg border transition-colors duration-press',
         done
-          ? 'border-brand/45 bg-brand text-white shadow-glow-brand'
-          : 'border-line bg-surface-sunken/80 text-content-faint hover:border-line-strong hover:text-content',
+          ? 'border-accent bg-accent text-paper'
+          : 'border-line bg-paper text-ink-faint hover:border-line-strong hover:text-ink-muted',
       )}
     >
       <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4">
@@ -71,15 +71,15 @@ function SetRow({
       transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
       className={cx(
         'flex items-center gap-1.5 rounded-xl py-1',
-        set.done && 'bg-white/[0.025]',
+        set.done && 'bg-canvas',
         isPr && 'animate-flash-pr',
       )}
     >
       <div className="w-5 shrink-0 text-center">
         <span
           className={cx(
-            'tnum text-caption font-semibold',
-            set.done ? 'text-brand-bright' : 'text-content-faint',
+            'tnum text-caption font-medium',
+            set.done ? 'text-accent' : 'text-ink-faint',
           )}
         >
           {index + 1}
@@ -108,7 +108,7 @@ function SetRow({
           step={1}
           max={100}
           decimals={0}
-          tone={set.reps > 0 && inRange ? 'brand' : 'default'}
+          tone={set.reps > 0 && inRange ? 'accent' : 'default'}
           placeholder={ref ? String(ref.reps) : String(low)}
         />
       </div>
@@ -177,26 +177,26 @@ export function ExerciseCard({
         exercise.skipped && 'opacity-45',
       )}
     >
-      <header className="flex items-start gap-3 px-3.5 pb-2.5 pt-3.5">
+      <header className="flex items-start gap-3 px-4 pb-3 pt-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-title font-semibold text-white">{exercise.name}</h3>
+            <h3 className="truncate text-title font-medium text-ink">{exercise.name}</h3>
             {complete && !exercise.skipped && (
               <motion.span
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', bounce: 0.3, duration: 0.32 }}
               >
-                <Pill tone="brand">Hecho</Pill>
+                <Pill tone="accent">Hecho</Pill>
               </motion.span>
             )}
           </div>
           {/* Una sola cadena: con separadores en elementos aparte, al saltar
               de línea se queda una viñeta huérfana al final. */}
-          <p className="mt-1 truncate text-micro text-content-muted">
+          <p className="mt-1 truncate text-micro text-ink-muted">
             {exercise.muscles.map((m) => MUSCLE_LABEL[m.muscle]).join(' · ')}
           </p>
-          <p className="tnum mt-0.5 text-micro text-content-faint">
+          <p className="tnum mt-0.5 text-micro text-ink-faint">
             {low}–{high} reps · {clock(exercise.targetRest)} de descanso
           </p>
         </div>
@@ -206,18 +206,16 @@ export function ExerciseCard({
             haptic(8);
             toggleSkip(exIdx);
           }}
-          className="pressable shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-micro font-semibold text-content-faint transition-colors duration-press hover:border-line-strong hover:text-content"
+          className="pressable shrink-0 rounded-md border border-line px-2.5 py-1.5 text-micro font-medium text-ink-faint transition-colors duration-press hover:border-line-strong hover:text-ink"
         >
           {exercise.skipped ? 'Recuperar' : 'Saltar'}
         </button>
       </header>
 
       {refLabel && !exercise.skipped && (
-        <div className="mx-3.5 mb-2 flex items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
-          <span className="text-micro font-semibold uppercase tracking-[0.07em] text-content-faint">
-            {reference?.source === 'hoja' ? 'De la hoja' : 'Última vez'}
-          </span>
-          <span className="tnum truncate text-micro text-content-muted">{refLabel}</span>
+        <div className="mx-4 mb-2 flex items-center gap-2 border-t border-line pt-2">
+          <span className="label">{reference?.source === 'hoja' ? 'De la hoja' : 'Última vez'}</span>
+          <span className="tnum truncate text-micro text-ink-muted">{refLabel}</span>
         </div>
       )}
 
@@ -225,18 +223,14 @@ export function ExerciseCard({
         <>
           {/* Cabecera de columnas: así el número va limpio, sin una unidad
               encima que se solape con las cifras de tres dígitos. */}
-          <div className="flex items-center gap-1.5 px-2.5 pb-1 pt-0.5">
+          <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-1">
             <span className="w-5 shrink-0" />
-            <span className="flex-1 text-center text-micro font-semibold uppercase tracking-[0.08em] text-content-faint">
-              kg
-            </span>
-            <span className="flex-1 text-center text-micro font-semibold uppercase tracking-[0.08em] text-content-faint">
-              reps
-            </span>
+            <span className="label flex-1 text-center">kg</span>
+            <span className="label flex-1 text-center">reps</span>
             <span className="w-12 shrink-0" />
           </div>
 
-          <div className="space-y-1 px-2.5 pb-1">
+          <div className="space-y-1 px-3 pb-1">
             <AnimatePresence initial={false}>
               {exercise.sets.map((set, i) => (
                 <SetRow
@@ -257,7 +251,7 @@ export function ExerciseCard({
           {/* Quitar afecta a la última serie: es como se piensa («hoy hago
               una menos»), y evita meter una equis en cada fila cuando el
               ancho de un móvil ya va justo. */}
-          <div className="flex gap-2 px-3.5 pb-3 pt-1.5">
+          <div className="flex gap-2 px-4 pb-4 pt-2">
             <Button
               size="sm"
               variant="quiet"
@@ -266,7 +260,7 @@ export function ExerciseCard({
                 haptic(8);
                 removeSet(exIdx, exercise.sets.length - 1);
               }}
-              className="border border-dashed border-line px-3 hover:border-line-strong"
+              className="border border-dashed border-line px-3 text-ink-faint hover:border-line-strong hover:text-ink"
             >
               <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M4.5 10h11" strokeLinecap="round" />
@@ -281,7 +275,7 @@ export function ExerciseCard({
                 haptic(8);
                 addSet(exIdx);
               }}
-              className="border border-dashed border-line hover:border-line-strong"
+              className="border border-dashed border-line text-ink-faint hover:border-line-strong hover:text-ink"
             >
               <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
@@ -293,7 +287,7 @@ export function ExerciseCard({
       )}
 
       {exercise.skipped && (
-        <p className="px-3.5 pb-4 text-caption text-content-faint">
+        <p className="px-4 pb-4 text-caption text-ink-faint">
           Fuera del entreno de hoy. La rutina no cambia.
         </p>
       )}

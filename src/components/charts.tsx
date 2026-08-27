@@ -17,6 +17,12 @@ import { cx } from './ui';
  * cifras escritas donde hace falta en vez de una etiqueta en cada punto.
  * ──────────────────────────────────────────────────────────────────────── */
 
+/* Rampa secuencial validada sobre papel blanco: un solo tono, L monótona,
+   saltos de luminosidad ≥0,06 y el extremo claro por encima de 2:1. */
+const RAMP = ['#9DB6E6', '#7196DC', '#4A78D2', '#2B5AC0', '#1B3F9E'] as const;
+const ACCENT = '#2B5AC0';
+const GRID = '#EFEFEA';
+
 export type BarDatum = {
   key: string;
   label: string;
@@ -49,14 +55,14 @@ export function BarList({
   const visible = data.filter((d) => d.value > 0 || d.band);
 
   if (!visible.length) {
-    return <p className="px-1 py-6 text-center text-caption text-content-faint">{emptyLabel}</p>;
+    return <p className="py-6 text-caption text-ink-faint">{emptyLabel}</p>;
   }
 
   return (
     <div className="space-y-2.5">
       {bandLabel && (
-        <p className="flex items-center gap-1.5 px-0.5 text-micro text-content-faint">
-          <span className="inline-block h-2.5 w-4 rounded-[2px] bg-brand/18 ring-1 ring-inset ring-brand/30" />
+        <p className="flex items-center gap-1.5 text-micro text-ink-faint">
+          <span className="inline-block h-2.5 w-4 rounded-[2px] bg-accent/10 ring-1 ring-inset ring-accent/20" />
           {bandLabel}
         </p>
       )}
@@ -66,24 +72,30 @@ export function BarList({
           const band = d.band ? { from: (d.band[0] / top) * 100, to: (Math.min(d.band[1], top) / top) * 100 } : null;
           return (
             <li key={d.key}>
-              <div className="mb-1 flex items-baseline justify-between gap-3">
-                <span className="truncate text-caption font-medium text-content">{d.label}</span>
-                <span className="tnum shrink-0 text-caption font-semibold text-white">{d.display}</span>
+              <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                <span className="truncate text-caption text-ink">{d.label}</span>
+                <span className="tnum shrink-0 text-caption font-medium text-ink">{d.display}</span>
               </div>
-              <div className="relative h-2 overflow-hidden rounded-full bg-white/[0.055]">
+              {/* La barra se ancla a la línea de base y remata en 4 px de
+                  radio; el carril queda casi invisible para no competir. */}
+              <div className="relative h-[6px] overflow-hidden rounded-[3px] bg-line-soft">
                 {band && (
                   <span
                     aria-hidden
-                    className="absolute inset-y-0 rounded-[2px] bg-brand/14 ring-1 ring-inset ring-brand/25"
+                    className="absolute inset-y-0 rounded-[2px] bg-accent/10 ring-1 ring-inset ring-accent/20"
                     style={{ left: `${band.from}%`, width: `${Math.max(0, band.to - band.from)}%` }}
                   />
                 )}
                 <span
-                  className="absolute inset-y-0 left-0 rounded-full bg-brand"
-                  style={{ width: `${pct}%`, transition: 'width 340ms cubic-bezier(.23,1,.32,1)' }}
+                  className="absolute inset-y-0 left-0 rounded-[3px]"
+                  style={{
+                    width: `${pct}%`,
+                    background: ACCENT,
+                    transition: 'width 420ms cubic-bezier(.16,1,.3,1)',
+                  }}
                 />
               </div>
-              {d.note && <p className="mt-1 text-micro text-content-faint">{d.note}</p>}
+              {d.note && <p className="mt-1.5 text-micro text-ink-faint">{d.note}</p>}
             </li>
           );
         })}
@@ -127,7 +139,7 @@ export function TrendLine({
 
   if (points.length < 2) {
     return (
-      <p className="px-1 py-8 text-center text-caption text-content-faint">
+      <p className="py-8 text-caption text-ink-faint">
         Hacen falta al menos dos sesiones para dibujar una tendencia.
       </p>
     );
@@ -171,8 +183,8 @@ export function TrendLine({
           aria-label={`Evolución de ${points.length} sesiones, de ${format(first.value)} a ${format(last.value)}`}>
           <defs>
             <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2E7BFF" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#2E7BFF" stopOpacity="0" />
+              <stop offset="0%" stopColor={ACCENT} stopOpacity="0.14" />
+              <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
             </linearGradient>
           </defs>
 
@@ -184,7 +196,7 @@ export function TrendLine({
               x2={W - padX}
               y1={padY + t * (H - padY * 2)}
               y2={padY + t * (H - padY * 2)}
-              stroke="rgba(255,255,255,.055)"
+              stroke={GRID}
               strokeWidth="1"
             />
           ))}
@@ -193,14 +205,14 @@ export function TrendLine({
           <path
             d={line}
             fill="none"
-            stroke="#2E7BFF"
+            stroke={ACCENT}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
 
           {/* El último punto siempre visible: es el dato que importa. */}
-          <circle cx={x(points.length - 1)} cy={y(last.value)} r="4.5" fill="#2E7BFF" stroke="#05070C" strokeWidth="2" />
+          <circle cx={x(points.length - 1)} cy={y(last.value)} r="4.5" fill={ACCENT} stroke="#FFFFFF" strokeWidth="2" />
 
           {active && hover != null && (
             <g>
@@ -209,19 +221,19 @@ export function TrendLine({
                 x2={x(hover)}
                 y1={padY}
                 y2={H - padY}
-                stroke="rgba(255,255,255,.22)"
+                stroke="#D4D4CE"
                 strokeWidth="1"
               />
-              <circle cx={x(hover)} cy={y(active.value)} r="5" fill="#6EA8FF" stroke="#05070C" strokeWidth="2" />
+              <circle cx={x(hover)} cy={y(active.value)} r="5" fill={ACCENT} stroke="#FFFFFF" strokeWidth="2" />
             </g>
           )}
         </svg>
       </div>
 
-      <div className="mt-1 flex items-center justify-between px-1 text-micro text-content-faint">
+      <div className="mt-1 flex items-center justify-between text-micro text-ink-faint">
         {active ? (
           <>
-            <span className="tnum font-semibold text-white">{format(active.value)}</span>
+            <span className="tnum font-medium text-ink">{format(active.value)}</span>
             <span className="tnum">
               {new Date(active.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
             </span>
@@ -229,7 +241,7 @@ export function TrendLine({
         ) : (
           <>
             <span className="tnum">{format(first.value)}</span>
-            <span className="tnum font-semibold text-content-muted">{format(last.value)}</span>
+            <span className="tnum font-medium text-ink-muted">{format(last.value)}</span>
           </>
         )}
       </div>
@@ -253,7 +265,7 @@ export function Spark({ points, className }: { points: number[]; className?: str
     .join(' ');
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={cx('h-[22px] w-[72px] shrink-0', className)} aria-hidden>
-      <path d={d} fill="none" stroke="#2E7BFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -283,7 +295,7 @@ export function ConsistencyGrid({
   const values = [...days.values()].filter((v) => v > 0);
   const p90 = values.length ? [...values].sort((a, b) => a - b)[Math.floor(values.length * 0.9)] ?? 1 : 1;
 
-  const STEPS = ['#31518C', '#2C63C4', '#2E7BFF', '#6EA8FF'];
+  const STEPS = [RAMP[0], RAMP[1], RAMP[2], RAMP[3]];
   const cells: { key: number; level: number; label: string }[] = [];
 
   for (let w = 0; w < weeks; w++) {
@@ -308,21 +320,21 @@ export function ConsistencyGrid({
           <span
             key={c.key}
             title={c.label}
-            className="aspect-square rounded-[3px]"
+            className="aspect-square rounded-[2px]"
             style={{
-              background: c.level === 0 ? 'rgba(255,255,255,.055)' : STEPS[c.level - 1],
+              background: c.level === 0 ? '#EFEFEA' : STEPS[c.level - 1],
               opacity: c.key > today.getTime() ? 0.25 : 1,
             }}
           />
         ))}
       </div>
-      <div className="mt-2 flex items-center justify-between text-micro text-content-faint">
+      <div className="mt-2.5 flex items-center justify-between text-micro text-ink-faint">
         <span>Hace {weeks} semanas</span>
         <span className="flex items-center gap-1">
           Menos
-          <span className="h-2.5 w-2.5 rounded-[2px] bg-white/[0.055]" />
-          {STEPS.map((s) => (
-            <span key={s} className="h-2.5 w-2.5 rounded-[2px]" style={{ background: s }} />
+          <span className="h-2.5 w-2.5 rounded-[2px] bg-line-soft" />
+          {STEPS.map((step) => (
+            <span key={step} className="h-2.5 w-2.5 rounded-[2px]" style={{ background: step }} />
           ))}
           Más
         </span>

@@ -41,7 +41,7 @@ export function NumberField({
    *  indistinguibles para un lector de pantalla. */
   context: string;
   placeholder?: string;
-  tone?: 'default' | 'brand';
+  tone?: 'default' | 'accent';
   size?: 'md' | 'lg';
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -102,8 +102,8 @@ export function NumberField({
   return (
     <div
       className={cx(
-        'flex items-stretch overflow-hidden rounded-xl border bg-surface-sunken/90 transition-colors duration-press',
-        tone === 'brand' ? 'border-brand/35' : 'border-line',
+        'flex items-stretch overflow-hidden rounded-lg border bg-paper transition-colors duration-press',
+        tone === 'accent' ? 'border-accent/40 bg-accent-wash/50' : 'border-line',
       )}
     >
       <Stepper
@@ -115,8 +115,8 @@ export function NumberField({
         }}
         onUp={stopHold}
       >
-        <svg viewBox="0 0 20 20" className="h-4 w-4" stroke="currentColor" strokeWidth="2.2" fill="none">
-          <path d="M4.5 10h11" strokeLinecap="round" />
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth="2" fill="none">
+          <path d="M4.8 10h10.4" strokeLinecap="round" />
         </svg>
       </Stepper>
 
@@ -147,8 +147,8 @@ export function NumberField({
             }
           }}
           className={cx(
-            'tnum w-full bg-transparent text-center font-semibold text-white outline-none',
-            'placeholder:font-normal placeholder:text-content-faint',
+            'tnum w-full bg-transparent text-center font-medium text-ink outline-none',
+            'placeholder:font-normal placeholder:text-ink-faint/70',
             size === 'lg' ? 'py-3 text-figure-lg' : 'py-2 text-figure',
           )}
         />
@@ -163,8 +163,8 @@ export function NumberField({
         }}
         onUp={stopHold}
       >
-        <svg viewBox="0 0 20 20" className="h-4 w-4" stroke="currentColor" strokeWidth="2.2" fill="none">
-          <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth="2" fill="none">
+          <path d="M10 4.8v10.4M4.8 10h10.4" strokeLinecap="round" />
         </svg>
       </Stepper>
     </div>
@@ -199,8 +199,8 @@ function Stepper({
       onLostPointerCapture={onUp}
       onContextMenu={(e) => e.preventDefault()}
       className={cx(
-        'grid shrink-0 place-items-center text-content-muted transition-colors duration-press',
-        'hover:bg-white/6 hover:text-white active:bg-white/10 active:text-white',
+        'grid shrink-0 place-items-center text-ink-faint transition-colors duration-press',
+        'hover:bg-sunken hover:text-ink active:bg-line-soft active:text-ink',
         className,
       )}
     >

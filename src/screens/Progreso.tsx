@@ -51,21 +51,26 @@ export function Progreso({ store }: { store: Store }) {
       note: `${b.sets.toFixed(1)} series · ${b.sharePct.toFixed(0)} % del total`,
     }));
 
-  /* Ordenado de más a menos: lo que estás dejando de entrenar queda abajo,
-     que es justo donde se busca cuando se abre esta lista. */
-  const weeklyData: BarDatum[] = MUSCLES.map((m) => {
+  /* Solo se dibujan los grupos con trabajo. Nueve filas repitiendo «sin
+     trabajo en la ventana», cada una con su franja de referencia, parecen
+     datos y no lo son: los grupos en blanco caben en una línea al final. */
+  const weekly = MUSCLES.map((m) => {
     const b = bars.find((x) => x.muscle === m);
-    const target = WEEKLY_TARGET[m];
-    const perWeek = b?.setsPerWeek ?? 0;
-    return {
-      key: m,
-      label: MUSCLE_LABEL[m],
-      value: perWeek,
-      display: `${perWeek.toFixed(1)}/sem`,
-      band: target,
-      note: statusNote(perWeek, target),
-    };
-  }).sort((a, b) => b.value - a.value);
+    return { muscle: m, perWeek: b?.setsPerWeek ?? 0, target: WEEKLY_TARGET[m] };
+  }).sort((a, b) => b.perWeek - a.perWeek);
+
+  const weeklyData: BarDatum[] = weekly
+    .filter((w) => w.perWeek > 0)
+    .map((w) => ({
+      key: w.muscle,
+      label: MUSCLE_LABEL[w.muscle],
+      value: w.perWeek,
+      display: `${w.perWeek.toFixed(1)}/sem`,
+      band: w.target,
+      note: statusNote(w.perWeek, w.target),
+    }));
+
+  const untouched = weekly.filter((w) => w.perWeek === 0).map((w) => MUSCLE_LABEL[w.muscle]);
 
   /* Ejercicios con al menos dos sesiones: son los únicos que pueden dibujar
      una progresión. */
@@ -108,54 +113,56 @@ export function Progreso({ store }: { store: Store }) {
   }
 
   return (
-    <div className="space-y-6 pb-6">
-      <header className="flex items-end justify-between gap-3 px-1 pt-1">
-        <h1 className="text-display font-semibold">Progreso</h1>
+    <div className="space-y-12 pb-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="font-display text-display-lg">Progreso</h1>
         <Segmented options={WINDOWS} value={win} onChange={setWin} />
       </header>
 
-      <Card className="grid grid-cols-2 gap-x-3 gap-y-4 p-4 sm:grid-cols-4">
+      <Card className="grid grid-cols-2 gap-x-4 gap-y-5 p-6 sm:grid-cols-4">
         <Stat label="Entrenos" value={totals.sessions} />
-        <Stat label="Tonelaje" value={tonnage(totals.tonnage)} tone="brand" />
+        <Stat label="Tonelaje" value={tonnage(totals.tonnage)} tone="accent" />
         <Stat label="Series" value={Math.round(totals.sets)} />
         <Stat label="Tiempo" value={duration(totals.time)} />
       </Card>
 
       <section>
         <SectionTitle>Qué has trabajado más</SectionTitle>
-        <Card className="p-4">
-          <p className="mb-3.5 text-caption text-content-muted">
-            Tonelaje repartido por grupo. Cada serie cuenta según cuánto recae sobre cada músculo, no entera para todos
-            los que participan.
-          </p>
-          <BarList data={volumeData} />
-        </Card>
+        <p className="mb-5 max-w-md text-caption text-ink-muted">
+          Tonelaje repartido por grupo. Cada serie cuenta según cuánto recae sobre cada músculo, no entera para todos
+          los que participan.
+        </p>
+        <BarList data={volumeData} />
       </section>
 
       <section>
         <SectionTitle>Series semanales</SectionTitle>
-        <Card className="p-4">
-          <p className="mb-3.5 text-caption text-content-muted">
-            Media de series efectivas por semana en los últimos {days} días.
+        <p className="mb-5 max-w-md text-caption text-ink-muted">
+          Media de series efectivas por semana en los últimos {days} días.
+        </p>
+        <BarList data={weeklyData} bandLabel="Franja de referencia semanal" max={24} />
+        {untouched.length > 0 && (
+          <p className="mt-5 border-t border-line pt-4 text-caption text-ink-faint">
+            <span className="font-medium text-ink-muted">Sin trabajo en {days} días: </span>
+            {untouched.join(', ')}.
           </p>
-          <BarList data={weeklyData} bandLabel="Franja de referencia semanal" max={24} />
-        </Card>
+        )}
       </section>
 
       {trackable.length > 0 && series && (
         <section>
           <SectionTitle>Fuerza por ejercicio</SectionTitle>
-          <Card className="p-4">
-            <div className="no-scrollbar -mx-4 mb-3.5 flex gap-1.5 overflow-x-auto px-4">
+          <div>
+            <div className="no-scrollbar -mx-6 mb-5 flex gap-1.5 overflow-x-auto px-6">
               {trackable.map((x) => (
                 <button
                   key={x.id}
                   onClick={() => setExerciseId(x.id)}
                   className={cx(
-                    'pressable shrink-0 rounded-lg border px-2.5 py-1.5 text-micro font-semibold transition-colors duration-press',
+                    'pressable shrink-0 rounded-md border px-3 py-1.5 text-micro font-medium transition-colors duration-press',
                     x.id === selectedExercise
-                      ? 'border-brand/45 bg-brand/12 text-brand-bright'
-                      : 'border-line bg-surface-sunken/60 text-content-muted hover:border-line-strong hover:text-content',
+                      ? 'border-accent/40 bg-accent-wash text-accent-deep'
+                      : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
                   {x.name}
@@ -163,35 +170,33 @@ export function Progreso({ store }: { store: Store }) {
               ))}
             </div>
 
-            <div className="mb-1 flex items-end justify-between gap-3">
+            <div className="mb-2 flex items-end justify-between gap-3">
               <div>
-                <p className="text-caption font-medium text-content">1RM estimado</p>
-                <p className="text-micro text-content-faint">
-                  Fórmula de Epley sobre tu mejor serie de cada sesión
-                </p>
+                <p className="text-caption font-medium text-ink">1RM estimado</p>
+                <p className="text-micro text-ink-faint">Fórmula de Epley sobre tu mejor serie de cada sesión</p>
               </div>
               {trend != null && (
-                <Pill tone={trend > 1 ? 'up' : trend < -1 ? 'down' : 'neutral'}>{signedPct(trend, 1)}</Pill>
+                <Pill tone={trend > 1 ? 'good' : trend < -1 ? 'warn' : 'neutral'}>{signedPct(trend, 1)}</Pill>
               )}
             </div>
 
             <TrendLine points={series.e1rm} format={(v) => `${kg(v, 0)} kg`} />
 
             {selectedExercise && pbs.get(selectedExercise) && (
-              <p className="tnum mt-2 border-t border-line pt-2.5 text-micro text-content-muted">
+              <p className="tnum mt-3 border-t border-line pt-3 text-micro text-ink-muted">
                 Mejor marca: {kg(pbs.get(selectedExercise)!.weight)} kg × {pbs.get(selectedExercise)!.reps}
-                <span className="text-content-faint"> · 1RM estimado {kg(pbs.get(selectedExercise)!.e1rm, 0)} kg</span>
+                <span className="text-ink-faint"> · 1RM estimado {kg(pbs.get(selectedExercise)!.e1rm, 0)} kg</span>
               </p>
             )}
-          </Card>
+          </div>
         </section>
       )}
 
       {selectedMuscle && mSeries.length > 1 && (
         <section>
           <SectionTitle>Volumen por grupo, sesión a sesión</SectionTitle>
-          <Card className="p-4">
-            <div className="no-scrollbar -mx-4 mb-3.5 flex gap-1.5 overflow-x-auto px-4">
+          <div>
+            <div className="no-scrollbar -mx-6 mb-5 flex gap-1.5 overflow-x-auto px-6">
               {bars
                 .filter((b) => b.sets > 0)
                 .map((b) => (
@@ -199,10 +204,10 @@ export function Progreso({ store }: { store: Store }) {
                     key={b.muscle}
                     onClick={() => setMuscle(b.muscle)}
                     className={cx(
-                      'pressable shrink-0 rounded-lg border px-2.5 py-1.5 text-micro font-semibold transition-colors duration-press',
+                      'pressable shrink-0 rounded-md border px-3 py-1.5 text-micro font-medium transition-colors duration-press',
                       b.muscle === selectedMuscle
-                        ? 'border-brand/45 bg-brand/12 text-brand-bright'
-                        : 'border-line bg-surface-sunken/60 text-content-muted hover:border-line-strong hover:text-content',
+                        ? 'border-accent/40 bg-accent-wash text-accent-deep'
+                        : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink',
                     )}
                   >
                     {MUSCLE_LABEL[b.muscle]}
@@ -210,30 +215,32 @@ export function Progreso({ store }: { store: Store }) {
                 ))}
             </div>
 
-            <div className="mb-1 flex items-end justify-between gap-3">
-              <p className="text-caption font-medium text-content">Tonelaje de {MUSCLE_LABEL[selectedMuscle].toLowerCase()}</p>
+            <div className="mb-2 flex items-end justify-between gap-3">
+              <p className="text-caption font-medium text-ink">
+                Tonelaje de {MUSCLE_LABEL[selectedMuscle].toLowerCase()}
+              </p>
               {mTrend != null && (
-                <Pill tone={mTrend > 1 ? 'up' : mTrend < -1 ? 'down' : 'neutral'}>{signedPct(mTrend, 1)}</Pill>
+                <Pill tone={mTrend > 1 ? 'good' : mTrend < -1 ? 'warn' : 'neutral'}>{signedPct(mTrend, 1)}</Pill>
               )}
             </div>
             <TrendLine points={mSeries} format={(v) => tonnage(v)} />
-          </Card>
+          </div>
         </section>
       )}
 
       {trackable.length > 0 && (
         <section>
           <SectionTitle>Mejores marcas</SectionTitle>
-          <Card className="divide-y divide-line p-0">
+          <div className="border-t border-line">
             {trackable.slice(0, 8).map((x) => {
               const pb = pbs.get(x.id);
               const s = exerciseSeries(store.sessions, x.id).e1rm;
               if (!pb) return null;
               return (
-                <div key={x.id} className="flex items-center gap-3 p-3.5">
+                <div key={x.id} className="flex items-center gap-4 border-b border-line py-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-body font-medium text-content">{x.name}</p>
-                    <p className="tnum text-micro text-content-faint">
+                    <p className="truncate text-body text-ink">{x.name}</p>
+                    <p className="tnum mt-0.5 text-micro text-ink-faint">
                       {kg(pb.weight)} kg × {pb.reps} · 1RM {kg(pb.e1rm, 0)} kg
                     </p>
                   </div>
@@ -241,12 +248,12 @@ export function Progreso({ store }: { store: Store }) {
                 </div>
               );
             })}
-          </Card>
+          </div>
         </section>
       )}
 
-      <p className="px-2 pb-2 text-micro leading-relaxed text-content-faint">
-        <span className="font-semibold text-content-muted">Cómo se calcula. </span>
+      <p className="max-w-md border-t border-line pt-5 text-micro leading-relaxed text-ink-faint">
+        <span className="font-semibold text-ink-muted">Cómo se calcula. </span>
         El tonelaje es la suma de peso × repeticiones. La intensidad es el 1RM estimado por Epley sobre tu mejor serie.
         La densidad es el tonelaje dividido entre el tiempo total, descansos incluidos. El índice de cada sesión compara
         los tres contra la mediana de tus últimas tres sesiones de ese grupo, y 100 significa «igual que tu media

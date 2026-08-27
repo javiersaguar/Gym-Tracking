@@ -1,4 +1,4 @@
-import { clock, duration, kg, tonnage } from './format';
+import { clock, duration, kg, plural, tonnage } from './format';
 import {
   exerciseStats,
   isFilled,
@@ -168,13 +168,13 @@ function buildHeadline(
       : `${prs.length} récords en una sola sesión, empezando por ${one.name}. ${tonnage(stats.tonnage)} en ${duration(stats.durationSec)}.`;
   }
   if (verdict === 'primera') {
-    return `Primera vez que registras este día. ${tonnage(stats.tonnage)} en ${stats.sets} series: a partir de aquí ya hay con qué comparar.`;
+    return `Primera vez que registras este día. ${tonnage(stats.tonnage)} en ${plural(stats.sets, 'serie')}: a partir de aquí ya hay con qué comparar.`;
   }
   if (verdict === 'progreso') {
     return `Índice ${index} sobre tu media reciente: has ido por encima, sobre todo en ${where}. ${tonnage(stats.tonnage)} en ${duration(stats.durationSec)}.`;
   }
   if (verdict === 'sostenido') {
-    return `Índice ${index}: en línea con tus últimas sesiones. ${tonnage(stats.tonnage)} en ${duration(stats.durationSec)}, ${stats.sets} series.`;
+    return `Índice ${index}: en línea con tus últimas sesiones. ${tonnage(stats.tonnage)} en ${duration(stats.durationSec)}, ${plural(stats.sets, 'serie')}.`;
   }
   return `Índice ${index}: por debajo de tu media reciente. Un día flojo no rompe nada, pero si se repite en ${where}, mira descanso y comida.`;
 }

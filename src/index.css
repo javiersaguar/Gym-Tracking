@@ -1,28 +1,33 @@
+/* La serif editorial se autoaloja: una fuente de CDN se cae justo cuando más
+   falta hace, y el service worker precachea el build entero. Solo el subconjunto
+   latino —24 KB— porque no hay texto en otros alfabetos. */
+@import '@fontsource/instrument-serif/latin-400.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   html {
     -webkit-tap-highlight-color: transparent;
-    /* El gimnasio se usa con una mano y con prisa: nada de rebotes raros ni
-       de zoom accidental al pulsar dos veces en un stepper. */
+    scroll-behavior: smooth;
+    /* Se usa con una mano y con prisa: nada de zoom accidental al pulsar dos
+       veces en un stepper. */
     touch-action: manipulation;
   }
 
   html,
   body,
   #root {
-    height: 100%;
+    min-height: 100%;
   }
 
   body {
-    @apply bg-canvas text-content font-sans antialiased;
-    font-feature-settings: 'cv05' 1, 'ss03' 1, 'tnum' 0;
+    @apply bg-canvas text-ink font-sans antialiased;
     /* `viewport-fit: cover` estira la página bajo la isla dinámica; el
        contenido tiene que respetar las muescas laterales. */
     padding-left: env(safe-area-inset-left);
@@ -30,39 +35,31 @@
     overscroll-behavior-y: none;
   }
 
-  /* Ambiente: dos luces azules muy tenues que dan profundidad al negro sin
-     ensuciarlo. Fijas, para que no se muevan con el scroll. */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -2;
-    pointer-events: none;
-    background:
-      radial-gradient(1100px 520px at 50% -18%, rgba(46, 123, 255, 0.13), transparent 62%),
-      radial-gradient(760px 420px at 100% 8%, rgba(127, 216, 255, 0.06), transparent 58%),
-      radial-gradient(680px 400px at 0% 34%, rgba(107, 166, 255, 0.045), transparent 60%);
-  }
-
-  /* Grano finísimo: quita el aspecto plano de los degradados. */
+  /* Grano finísimo sobre el hueso: quita el aspecto de plano vectorial sin
+     ensuciar el blanco. Fijo, para que no se mueva con el scroll. */
   body::after {
     content: '';
     position: fixed;
     inset: 0;
-    z-index: -1;
+    z-index: 0;
     pointer-events: none;
-    opacity: 0.3;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+    opacity: 0.024;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   h1,
   h2,
   h3 {
-    @apply tracking-tightest text-white;
+    @apply text-ink;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 
   ::selection {
-    @apply bg-brand text-white;
+    @apply bg-accent-wash text-accent-deep;
   }
 
   /* Cifras siempre tabulares: una columna de kilos no puede bailar al pasar
@@ -94,7 +91,7 @@
     height: 8px;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: #dedeD8;
     border-radius: 99px;
   }
   ::-webkit-scrollbar-track {
@@ -103,29 +100,24 @@
 }
 
 @layer components {
-  /* Superficie base de tarjeta: un borde de un píxel y una luz superior que
-     simula el canto de un material real. */
+  /* Tarjeta: papel blanco sobre hueso, un borde de un píxel y nada más. La
+     jerarquía la da el contraste de superficie, no una sombra. */
   .card {
-    @apply rounded-2xl border border-line bg-surface/80 shadow-card backdrop-blur-xl;
+    @apply rounded-xl border border-line bg-paper;
   }
 
   /* Barras flotantes: material translúcido con el contenido pasando por
      debajo, no una franja opaca que se come la pantalla. */
   .chrome {
-    background: rgba(8, 11, 18, 0.72);
-    backdrop-filter: blur(22px) saturate(170%);
-    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    background: rgba(250, 250, 248, 0.82);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
   }
 
-  /* El cronómetro se apoya sobre tarjetas llenas de cifras, y ahí el cristal
-     fino deja que se lea el fondo a través del número. Más cuerpo: sigue
-     siendo material, pero manda él. */
+  /* El cronómetro se apoya sobre tarjetas llenas de cifras y tiene que poder
+     mirarse de reojo: ahí manda él, sin transparencia. */
   .chrome-solid {
-    /* Opaco del todo. Con un 4 % de transparencia todavía se leían los
-       kilos de la tarjeta de debajo por detrás de la cifra del cronómetro,
-       y esta barra es justo la que hay que poder mirar de reojo. */
-    background: #080b12;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    @apply bg-paper;
   }
 
   /* Realce interactivo: se pinta en pointer-down, nunca al soltar. */
@@ -133,11 +125,13 @@
     @apply transition-transform duration-press ease-out;
   }
   .pressable:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
-  .hairline {
-    @apply border-t border-line;
+  /* Etiqueta de sección: versalita ancha, el recurso tipográfico que ordena
+     una página sin dibujar ni una caja. */
+  .label {
+    @apply text-micro font-semibold uppercase tracking-label text-ink-faint;
   }
 }
 
@@ -153,6 +147,11 @@
   }
   .no-scrollbar {
     scrollbar-width: none;
+  }
+  /* Cascada de entrada: cada elemento entra 70 ms después del anterior. */
+  .stagger > * {
+    animation: enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
   }
 }
 
@@ -172,13 +171,9 @@
 /* Sin transparencias: se sustituye el cristal por superficie sólida antes de
    que la legibilidad se venga abajo. */
 @media (prefers-reduced-transparency: reduce) {
-  .chrome,
-  .chrome-solid {
-    background: #080b12;
+  .chrome {
+    background: #fafaf8;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-  }
-  .card {
-    @apply bg-surface backdrop-blur-none;
   }
 }

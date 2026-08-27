@@ -1,9 +1,8 @@
-import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { ConsistencyGrid } from '../components/charts';
-import { Button, Card, Pill, SectionTitle, Stat, cx } from '../components/ui';
+import { Button, Card, Rule, SectionTitle, Stat, cx } from '../components/ui';
 import { cycleState } from '../lib/actions';
-import { duration, longDate, plural, relativeDay, tonnage } from '../lib/format';
+import { duration, plural, relativeDay, tonnage } from '../lib/format';
 import { balance, sessionStats } from '../lib/metrics';
 import { MUSCLE_LABEL, type Store } from '../lib/types';
 
@@ -20,20 +19,20 @@ export function Hoy({
 }) {
   const cycle = useMemo(() => cycleState(store), [store]);
   const active = store.active;
+  const day = cycle.day;
 
   const week = useMemo(() => {
     const from = Date.now() - 7 * 86_400_000;
-    const recent = store.sessions.filter((s) => s.start >= from);
-    const stats = recent.map(sessionStats);
+    const stats = store.sessions.filter((s) => s.start >= from).map(sessionStats);
     return {
-      count: recent.length,
+      count: stats.length,
       tonnage: stats.reduce((a, b) => a + b.tonnage, 0),
       time: stats.reduce((a, b) => a + b.durationSec, 0),
       sets: stats.reduce((a, b) => a + b.sets, 0),
     };
   }, [store.sessions]);
 
-  const focus = useMemo(() => balance(store.sessions, 14).filter((b) => b.sets > 0).slice(0, 3), [store.sessions]);
+  const focus = useMemo(() => balance(store.sessions, 14).filter((b) => b.sets > 0).slice(0, 4), [store.sessions]);
 
   const byDay = useMemo(() => {
     const m = new Map<number, number>();
@@ -45,127 +44,82 @@ export function Hoy({
     return m;
   }, [store.sessions]);
 
-  const day = cycle.day;
-
   return (
-    <div className="space-y-6 pb-6">
-      <header className="px-1 pt-1">
-        <p className="text-caption font-medium text-content-faint">{longDate(Date.now())}</p>
-        <h1 className="mt-0.5 text-display font-semibold">
-          {active ? 'Entreno en marcha' : cycle.trainedToday ? 'Ya has entrenado' : day.rest ? 'Toca descansar' : 'Listo para entrenar'}
+    <div className="space-y-12 pb-8">
+      <header>
+        <h1 className="font-display text-display-lg">
+          {active
+            ? 'Entreno en marcha'
+            : cycle.trainedToday
+              ? 'Ya has entrenado hoy'
+              : day.rest
+                ? 'Toca descansar'
+                : 'Listo para entrenar'}
         </h1>
+        <p className="mt-3 max-w-md text-body text-ink-muted">
+          {active
+            ? `${active.dayName}, empezado a las ${new Date(active.start).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.`
+            : day.rest
+              ? `Día ${day.index} del ciclo. Si prefieres entrenar, elige otro día desde la rutina.`
+              : cycle.trainedToday
+                ? /* El ciclo ya ha avanzado: hay que decir que lo de abajo es
+                     lo siguiente, no lo de hoy, o el botón engaña. */
+                  `Lo siguiente es el día ${day.index}: ${day.name.toLowerCase()}.`
+                : `Día ${day.index} del ciclo: ${day.name.toLowerCase()}.`}
+        </p>
+
+        <div className="mt-6 flex gap-2">
+          {active ? (
+            <Button variant="primary" size="lg" buzz onClick={onResume}>
+              Seguir con el entreno
+            </Button>
+          ) : (
+            <Button
+              variant={cycle.trainedToday ? 'outline' : 'primary'}
+              size="lg"
+              buzz
+              onClick={() => (day.rest ? onNavigate('/rutina') : onStart(day.id))}
+            >
+              {day.rest ? 'Elegir un día' : cycle.trainedToday ? `Empezar el día ${day.index}` : 'Empezar entreno'}
+            </Button>
+          )}
+        </div>
       </header>
 
-      {/* Tarjeta principal: lo único que hay que hacer al abrir la app. */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.34, ease: [0.22, 0.68, 0.28, 1] }}>
-        <Card className={cx('overflow-hidden', active && 'border-brand/35 shadow-glow-brand')}>
-          <div className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <Pill tone={active ? 'brand' : 'neutral'}>
-                    Día {active ? active.dayIndex : day.index} de {store.routine.days.length}
-                  </Pill>
-                  {active && <Pill tone="brand">En curso</Pill>}
-                </div>
-                <h2 className="mt-2 text-title-lg font-semibold">{active ? active.dayName : day.name}</h2>
-                <p className="mt-1 text-caption text-content-muted">
-                  {active
-                    ? `Empezado a las ${new Date(active.start).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`
-                    : day.rest
-                      ? 'Día de descanso del ciclo. Puedes entrenar igualmente eligiendo otro día.'
-                      : `${plural(day.exercises.length, 'ejercicio')} · ${plural(day.exercises.reduce((a, e) => a + e.plannedSets, 0), 'serie')} previstas`}
-                </p>
-              </div>
-            </div>
-
-            {!active && !day.rest && (
-              <ul className="mt-3.5 flex flex-wrap gap-1.5">
-                {day.exercises.slice(0, 5).map((e) => (
-                  <li key={e.id} className="rounded-lg border border-line bg-white/[0.03] px-2 py-1 text-micro text-content-muted">
-                    {e.name}
-                  </li>
-                ))}
-                {day.exercises.length > 5 && (
-                  <li className="rounded-lg px-2 py-1 text-micro text-content-faint">+{day.exercises.length - 5} más</li>
-                )}
-              </ul>
-            )}
-
-            <div className="mt-4 flex gap-2">
-              {active ? (
-                <Button variant="primary" size="lg" block buzz onClick={onResume}>
-                  Seguir con el entreno
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    variant={day.rest ? 'ghost' : 'primary'}
-                    size="lg"
-                    block
-                    buzz
-                    onClick={() => (day.rest ? onNavigate('/rutina') : onStart(day.id))}
-                  >
-                    {day.rest ? 'Elegir otro día' : 'Empezar entreno'}
-                  </Button>
-                  {!day.rest && (
-                    <Button variant="ghost" size="lg" onClick={() => onNavigate('/rutina')} aria-label="Ver la rutina">
-                      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                        <path d="M4 5.5h12M4 10h12M4 14.5h8" strokeLinecap="round" />
-                      </svg>
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {cycle.lastSession && !active && (
-            <button
-              onClick={() => onNavigate(`/sesion/${cycle.lastSession?.id}`)}
-              className="hairline flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-press hover:bg-white/[0.03]"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-caption font-medium text-content">
-                  {relativeDay(cycle.lastSession.start)} · {cycle.lastSession.dayName}
+      {!active && !day.rest && (
+        <section>
+          <SectionTitle>Lo que toca</SectionTitle>
+          <ol className="border-t border-line">
+            {day.exercises.map((e) => (
+              <li key={e.id} className="flex items-baseline justify-between gap-4 border-b border-line py-3">
+                <span className="min-w-0 flex-1 truncate text-body text-ink">{e.name}</span>
+                <span className="tnum shrink-0 text-caption text-ink-faint">
+                  {e.plannedSets} × {e.repRange[0]}–{e.repRange[1]}
                 </span>
-                <span className="tnum block text-micro text-content-faint">
-                  {tonnage(sessionStats(cycle.lastSession).tonnage)} · {duration(sessionStats(cycle.lastSession).durationSec)}
-                </span>
-              </span>
-              <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-content-faint" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M7.5 4.5l5.5 5.5-5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
-        </Card>
-      </motion.div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
-      {/* El ciclo entero, para saber dónde estás sin abrir la rutina. */}
       <section>
         <SectionTitle>El ciclo</SectionTitle>
-        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="no-scrollbar -mx-6 flex gap-2 overflow-x-auto px-6">
           {store.routine.days.map((d) => {
-            const isNext = d.id === day.id && !active;
-            const isActive = active?.dayId === d.id;
+            const here = d.id === day.id;
             return (
               <button
                 key={d.id}
                 onClick={() => (active ? onResume() : d.rest ? onNavigate('/rutina') : onStart(d.id))}
                 className={cx(
-                  'pressable flex w-[92px] shrink-0 flex-col items-start gap-1 rounded-xl border px-2.5 py-2.5 text-left transition-colors duration-panel',
-                  isActive || isNext
-                    ? 'border-brand/40 bg-brand/10'
-                    : d.rest
-                      ? 'border-line bg-surface-sunken/60'
-                      : 'border-line bg-surface/70 hover:border-line-strong',
+                  'pressable flex w-[86px] shrink-0 flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors duration-panel',
+                  here ? 'border-accent/40 bg-accent-wash' : 'border-line bg-paper hover:border-line-strong',
                 )}
               >
-                <span className={cx('tnum text-micro font-semibold', isActive || isNext ? 'text-brand-bright' : 'text-content-faint')}>
-                  Día {d.index}
+                <span className={cx('tnum text-micro', here ? 'font-semibold text-accent-deep' : 'text-ink-faint')}>
+                  {String(d.index).padStart(2, '0')}
                 </span>
-                <span className={cx('text-caption font-semibold', d.rest ? 'text-content-faint' : 'text-white')}>{d.short}</span>
-                <span className="text-micro text-content-faint">{d.rest ? 'Descanso' : `${d.exercises.length} ej.`}</span>
+                <span className={cx('text-caption font-medium', d.rest ? 'text-ink-faint' : 'text-ink')}>{d.short}</span>
               </button>
             );
           })}
@@ -173,44 +127,70 @@ export function Hoy({
       </section>
 
       <section>
-        <SectionTitle action={<button onClick={() => onNavigate('/progreso')} className="text-micro font-semibold text-brand-bright">Ver progreso</button>}>
+        <SectionTitle
+          action={
+            <button onClick={() => onNavigate('/progreso')} className="text-micro font-medium text-accent hover:underline">
+              Ver progreso
+            </button>
+          }
+        >
           Últimos 7 días
         </SectionTitle>
-        <Card className="grid grid-cols-3 gap-3 p-4">
+        <Card className="grid grid-cols-3 gap-4 p-6">
           <Stat label="Entrenos" value={week.count} hint={week.count ? plural(week.sets, 'serie') : 'Ninguno aún'} />
-          <Stat label="Tonelaje" value={tonnage(week.tonnage)} tone="brand" />
+          <Stat label="Tonelaje" value={tonnage(week.tonnage)} tone="accent" />
           <Stat label="Tiempo" value={duration(week.time)} />
         </Card>
       </section>
 
       {focus.length > 0 && (
         <section>
-          <SectionTitle>Lo más trabajado (14 días)</SectionTitle>
-          <Card className="space-y-2.5 p-4">
+          <SectionTitle>Lo más trabajado · 14 días</SectionTitle>
+          <ul className="border-t border-line">
             {focus.map((b) => (
-              <div key={b.muscle} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 truncate text-caption font-medium text-content">{MUSCLE_LABEL[b.muscle]}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.055]">
+              <li key={b.muscle} className="flex items-center gap-4 border-b border-line py-3">
+                <span className="w-24 shrink-0 truncate text-body text-ink">{MUSCLE_LABEL[b.muscle]}</span>
+                <span className="h-[6px] flex-1 overflow-hidden rounded-[3px] bg-line-soft">
                   <span
-                    className="block h-full rounded-full bg-brand"
+                    className="block h-full rounded-[3px] bg-accent"
                     style={{ width: `${Math.min(100, (b.sharePct / (focus[0]?.sharePct || 1)) * 100)}%` }}
                   />
                 </span>
-                <span className="tnum w-16 shrink-0 text-right text-caption font-semibold text-white">
+                <span className="tnum w-16 shrink-0 text-right text-caption text-ink-muted">
                   {b.sets.toFixed(1)} ser.
                 </span>
-              </div>
+              </li>
             ))}
-          </Card>
+          </ul>
         </section>
       )}
 
       {store.sessions.length > 0 && (
         <section>
           <SectionTitle>Constancia</SectionTitle>
-          <Card className="p-4">
-            <ConsistencyGrid days={byDay} weeks={12} />
-          </Card>
+          <ConsistencyGrid days={byDay} weeks={12} />
+        </section>
+      )}
+
+      {cycle.lastSession && (
+        <section>
+          <Rule className="mb-4" />
+          <button
+            onClick={() => onNavigate(`/sesion/${cycle.lastSession?.id}`)}
+            className="group flex w-full items-center gap-4 text-left"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="label">Último entreno</span>
+              <span className="mt-1.5 block truncate text-body font-medium text-ink">
+                {relativeDay(cycle.lastSession.start)} · {cycle.lastSession.dayName}
+              </span>
+              <span className="tnum mt-0.5 block text-caption text-ink-faint">
+                {tonnage(sessionStats(cycle.lastSession).tonnage)} ·{' '}
+                {duration(sessionStats(cycle.lastSession).durationSec)}
+              </span>
+            </span>
+            <span className="shrink-0 text-micro font-medium text-accent">Ver análisis</span>
+          </button>
         </section>
       )}
     </div>

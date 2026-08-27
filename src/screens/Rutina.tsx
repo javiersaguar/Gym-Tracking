@@ -36,26 +36,26 @@ export function Rutina({
   );
 
   return (
-    <div className="space-y-5 pb-6">
-      <header className="flex items-start justify-between gap-3 px-1 pt-1">
+    <div className="space-y-8 pb-8">
+      <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-display font-semibold">Rutina</h1>
-          <p className="mt-1 text-caption text-content-muted">{store.routine.name} · se aplica al próximo entreno</p>
+          <h1 className="font-display text-display-lg">Rutina</h1>
+          <p className="mt-3 text-caption text-ink-muted">{store.routine.name} · se aplica al próximo entreno</p>
         </div>
         <button
           onClick={() => onNavigate('/ajustes')}
           aria-label="Ajustes"
-          className="pressable grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line text-content-muted hover:border-line-strong hover:text-content"
+          className="pressable grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line bg-paper text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
         >
-          <svg viewBox="0 0 20 20" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.6">
-            <circle cx="10" cy="10" r="2.6" />
-            <path d="M10 2.6v1.8M10 15.6v1.8M17.4 10h-1.8M4.4 10H2.6M15.2 4.8l-1.3 1.3M6.1 13.9l-1.3 1.3M15.2 15.2l-1.3-1.3M6.1 6.1L4.8 4.8" strokeLinecap="round" />
+          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="10" cy="10" r="2.5" />
+            <path d="M10 2.8v1.7M10 15.5v1.7M17.2 10h-1.7M4.5 10H2.8M15.1 4.9l-1.2 1.2M6.1 13.9l-1.2 1.2M15.1 15.1l-1.2-1.2M6.1 6.1L4.9 4.9" strokeLinecap="round" />
           </svg>
         </button>
       </header>
 
       {/* Selector de día. Se ve el ciclo entero de un vistazo. */}
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="no-scrollbar -mx-6 flex gap-2 overflow-x-auto px-6">
         {days.map((d) => (
           <button
             key={d.id}
@@ -64,25 +64,23 @@ export function Rutina({
               setDayId(d.id);
             }}
             className={cx(
-              'pressable flex shrink-0 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left transition-colors duration-panel',
-              d.id === dayId
-                ? 'border-brand/45 bg-brand/12'
-                : 'border-line bg-surface-sunken/60 hover:border-line-strong',
+              'pressable flex shrink-0 flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors duration-panel',
+              d.id === dayId ? 'border-accent/40 bg-accent-wash' : 'border-line bg-paper hover:border-line-strong',
             )}
           >
-            <span className={cx('tnum text-micro font-semibold', d.id === dayId ? 'text-brand-bright' : 'text-content-faint')}>
-              Día {d.index}
+            <span className={cx('tnum text-micro', d.id === dayId ? 'font-semibold text-accent-deep' : 'text-ink-faint')}>
+              {String(d.index).padStart(2, '0')}
             </span>
-            <span className={cx('text-caption font-semibold', d.rest ? 'text-content-faint' : 'text-white')}>{d.short}</span>
+            <span className={cx('text-caption font-medium', d.rest ? 'text-ink-faint' : 'text-ink')}>{d.short}</span>
           </button>
         ))}
       </div>
 
-      <Card className="p-4">
+      <Card className="p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-title-lg font-semibold">{day.name}</h2>
-            <p className="tnum mt-1 text-caption text-content-muted">
+            <h2 className="truncate font-display text-display">{day.name}</h2>
+            <p className="tnum mt-2 text-caption text-ink-muted">
               {day.rest
                 ? 'Día de descanso del ciclo'
                 : `${plural(day.exercises.length, 'ejercicio')} · ${plural(totalSets, 'serie')} · ~${Math.round(estimated / 60)} min`}
@@ -97,9 +95,9 @@ export function Rutina({
       </Card>
 
       {day.rest ? (
-        <Card className="p-6 text-center">
-          <p className="text-body-lg font-semibold text-content">Descanso</p>
-          <p className="mx-auto mt-1.5 max-w-xs text-caption text-content-muted">
+        <Card className="p-8">
+          <p className="font-display text-display text-ink">Descanso</p>
+          <p className="mt-3 max-w-sm text-body text-ink-muted">
             No hay nada que editar. Si algún día quieres entrenar igualmente, elige otro día del ciclo y dale a
             «Entrenar».
           </p>
@@ -118,11 +116,11 @@ export function Rutina({
                   exit={{ opacity: 0, height: 0, marginTop: 0 }}
                   transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
                 >
-                  <Card className="p-3.5">
+                  <Card className="p-4">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-body font-semibold text-white">{ex.name}</p>
-                        <p className="mt-0.5 truncate text-micro text-content-faint">
+                        <p className="truncate text-body font-medium text-ink">{ex.name}</p>
+                        <p className="mt-1 truncate text-micro text-ink-faint">
                           {ex.muscles.map((m) => `${MUSCLE_LABEL[m.muscle]} ${Math.round(m.share * 100)} %`).join(' · ')}
                         </p>
                       </div>
@@ -168,9 +166,9 @@ export function Rutina({
                       />
                     </div>
 
-                    <p className="mt-2 text-micro text-content-faint">
+                    <p className="mt-2.5 text-micro text-ink-faint">
                       Objetivo {ex.repRange[0]}–{ex.repRange[1]} repeticiones
-                      {ex.notes && <span className="text-content-muted"> · {ex.notes}</span>}
+                      {ex.notes && <span className="text-ink-muted"> · {ex.notes}</span>}
                     </p>
                   </Card>
                 </motion.li>
@@ -178,14 +176,14 @@ export function Rutina({
             </AnimatePresence>
           </ul>
 
-          <Button variant="quiet" block onClick={() => setAdding(true)} className="border border-dashed border-line py-5">
+          <Button variant="quiet" block onClick={() => setAdding(true)} className="h-auto border border-dashed border-line py-4 text-ink-faint hover:text-ink">
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
             </svg>
             Añadir ejercicio al día {day.index}
           </Button>
 
-          <p className="px-2 text-micro text-content-faint">
+          <p className="max-w-md text-micro text-ink-faint">
             Los cambios aquí valen para los próximos entrenos. Las sesiones ya guardadas conservan lo que hiciste ese
             día.
           </p>
@@ -203,13 +201,13 @@ export function Rutina({
       </Sheet>
 
       <Sheet open={removing != null} onClose={() => setRemoving(null)} title="Quitar de la rutina">
-        <p className="pb-4 text-body text-content-muted">
+        <p className="pb-4 text-body text-ink-muted">
           {removing != null && day.exercises[removing]
             ? `«${day.exercises[removing]?.name}» deja de aparecer en el día ${day.index}. Tus sesiones anteriores no cambian.`
             : ''}
         </p>
         <div className="flex gap-2 pb-4">
-          <Button variant="ghost" block onClick={() => setRemoving(null)}>
+          <Button variant="outline" block onClick={() => setRemoving(null)}>
             Cancelar
           </Button>
           <Button
@@ -251,9 +249,9 @@ function IconBtn({
         onClick();
       }}
       className={cx(
-        'pressable grid h-8 w-8 place-items-center rounded-lg transition-colors duration-press',
+        'pressable grid h-8 w-8 place-items-center rounded-md transition-colors duration-press',
         'disabled:pointer-events-none disabled:opacity-25',
-        danger ? 'text-content-faint hover:bg-danger/12 hover:text-danger' : 'text-content-faint hover:bg-white/6 hover:text-content',
+        danger ? 'text-ink-faint hover:bg-bad-wash hover:text-bad-ink' : 'text-ink-faint hover:bg-sunken hover:text-ink',
       )}
     >
       <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -279,7 +277,7 @@ function Adjuster({
   upDisabled?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-xl border border-line bg-surface-sunken/80 p-1">
+    <div className="flex items-center gap-1 rounded-lg border border-line bg-canvas p-1">
       <button
         aria-label={`Bajar ${label.toLowerCase()}`}
         disabled={downDisabled}
@@ -287,15 +285,15 @@ function Adjuster({
           haptic(8);
           onDown();
         }}
-        className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-lg text-content-muted transition-colors duration-press hover:bg-white/6 hover:text-white disabled:pointer-events-none disabled:opacity-25"
+        className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-md text-ink-faint transition-colors duration-press hover:bg-paper hover:text-ink disabled:pointer-events-none disabled:opacity-25"
       >
-        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M4.5 10h11" strokeLinecap="round" />
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4.8 10h10.4" strokeLinecap="round" />
         </svg>
       </button>
       <span className="min-w-0 flex-1 text-center">
-        <span className="block text-micro text-content-faint">{label}</span>
-        <span className="tnum block text-caption font-semibold text-white">{value}</span>
+        <span className="block text-micro text-ink-faint">{label}</span>
+        <span className="tnum block text-caption font-medium text-ink">{value}</span>
       </span>
       <button
         aria-label={`Subir ${label.toLowerCase()}`}
@@ -304,10 +302,10 @@ function Adjuster({
           haptic(8);
           onUp();
         }}
-        className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-lg text-content-muted transition-colors duration-press hover:bg-white/6 hover:text-white disabled:pointer-events-none disabled:opacity-25"
+        className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-md text-ink-faint transition-colors duration-press hover:bg-paper hover:text-ink disabled:pointer-events-none disabled:opacity-25"
       >
-        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M10 4.8v10.4M4.8 10h10.4" strokeLinecap="round" />
         </svg>
       </button>
     </div>
@@ -329,21 +327,21 @@ function AddList({ onPick }: { onPick: (id: string) => void }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar ejercicio…"
-        className="mb-3 w-full rounded-xl border border-line bg-surface-sunken px-3.5 py-2.5 text-body text-content outline-none transition duration-200 placeholder:text-content-faint focus:border-brand/50 focus:ring-4 focus:ring-brand/10"
+        className="mb-3 w-full rounded-lg border border-line bg-paper px-3.5 py-2.5 text-body text-ink outline-none transition duration-200 placeholder:text-ink-faint/70 focus:border-accent/50 focus:ring-4 focus:ring-accent/12"
       />
-      <ul className="space-y-1 pb-4">
+      <ul className="border-t border-line pb-4">
         {list.map((x) => (
           <li key={x.id}>
             <button
               onClick={() => onPick(x.id)}
-              className="pressable flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface-sunken/60 px-3.5 py-3 text-left transition-colors duration-press hover:border-line-strong"
+              className="flex w-full items-center justify-between gap-3 border-b border-line py-3.5 text-left transition-colors duration-press hover:bg-canvas"
             >
-              <span className="truncate text-body font-medium text-content">{x.name}</span>
+              <span className="truncate text-body text-ink">{x.name}</span>
               <Pill>2 series</Pill>
             </button>
           </li>
         ))}
-        {!list.length && <li className="py-6 text-center text-caption text-content-faint">Nada con ese nombre.</li>}
+        {!list.length && <li className="py-8 text-caption text-ink-faint">Nada con ese nombre.</li>}
       </ul>
     </>
   );
