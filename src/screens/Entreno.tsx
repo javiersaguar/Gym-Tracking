@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { RestTimer, SessionClock } from '../components/RestTimer';
 import { Button, Card, Scale, Sheet } from '../components/ui';
-import { addExerciseToSession, completeSet, discardSession, finishSession } from '../lib/actions';
+import { addExerciseToSession, completeSet, discardSession, finishSession, patchSet } from '../lib/actions';
 import { clock, duration, plural } from '../lib/format';
 import { haptic, useKeepAwake, useRestTimer, useTick } from '../lib/hooks';
 import { personalBests } from '../lib/metrics';
@@ -75,6 +75,23 @@ export function Entreno({
     else rows.current.delete(key);
   }, []);
 
+  /**
+   * Cierra el descanso y lo deja escrito en la serie que va a empezar.
+   *
+   * Se guarda al parar el cronómetro y no al marcar la serie siguiente para
+   * que el tiempo aparezca en pantalla en ese momento y se quede ahí: al
+   * mirar la tarjeta después se ve el ritmo real del ejercicio.
+   */
+  const handleRestFinished = (elapsed: number, slot: { exIdx: number; setIdx: number } | null) => {
+    haptic(12);
+    if (!slot) return;
+    /* La primerísima serie del entreno no tiene un antes que medir. */
+    if (slot.exIdx === 0 && slot.setIdx === 0) return;
+    if (active.exercises[slot.exIdx]?.sets[slot.setIdx]) {
+      patchSet(slot.exIdx, slot.setIdx, { restSec: Math.round(elapsed) });
+    }
+  };
+
   const handleSetDone = (exIdx: number, setIdx: number) => {
     const ex = active.exercises[exIdx];
     if (!ex) return;
@@ -82,7 +99,9 @@ export function Entreno({
        el que se paró a mano con «Listo» hace un momento y todavía no se ha
        asignado a ninguna serie. Se guarda también en la primera serie de un
        ejercicio: ahí es donde se apunta la espera por la máquina. */
-    const rest = timer.running ? Math.round(timer.stop()) : timer.takePending();
+    const measured = timer.running ? Math.round(timer.stop()) : timer.takePending();
+    /* Si el descanso ya se apuntó al parar el cronómetro, se respeta. */
+    const rest = ex.sets[setIdx]?.restSec ?? measured;
     completeSet(exIdx, setIdx, rest);
 
     const isLastSet = setIdx === ex.sets.length - 1;
@@ -169,7 +188,7 @@ export function Entreno({
         <RestTimer
           timer={timer}
           contextLabel={nextUp ? `Luego: ${nextUp.name} · serie ${nextUp.setNumber}` : 'Última serie del entreno'}
-          onFinish={() => haptic(12)}
+          onFinish={handleRestFinished}
         />
       </div>
 

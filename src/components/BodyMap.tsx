@@ -1,108 +1,57 @@
 import { useState } from 'react';
 import type { Muscle } from '../lib/types';
 import { MUSCLE_LABEL } from '../lib/types';
+import { BACK, FRONT, SILHOUETTE, VIEW_H, VIEW_W, type Piece } from './anatomy';
 import { cx } from './ui';
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Mapa de calor muscular
  *
- * Dos siluetas, delante y detrás, con una región por grupo. El color no es el
- * tonelaje: es la puntuación compuesta (volumen, frecuencia, intensidad y
- * progreso), porque un gemelo puede mover poco peso y estar perfectamente
- * atendido mientras una espalda mueve mucho y va a medias.
+ * Escala térmica como la de un mapa del tiempo: azul lo menos entrenado,
+ * rojo lo más. Es la convención que ya sabe leer cualquiera para este tipo de
+ * mapa, y por eso se usa aquí en vez de la rampa azul del resto de la app.
  *
- * La figura se compone de elipses y rectángulos redondeados en vez de un
- * contorno anatómico: a 150 px de ancho en un móvil, lo que importa es
- * reconocer de un vistazo dónde cae cada mancha, no el detalle del músculo.
+ * El arcoíris tiene mala fama en visualización porque el orden de los tonos
+ * no es evidente y no es perceptualmente uniforme. Aquí se compensa de tres
+ * formas: los tonos van además de oscuro a claro y de vuelta a saturado, cada
+ * músculo lleva su cifra escrita en la lista de al lado, y la leyenda es un
+ * degradado continuo con los dos extremos rotulados.
  *
- * Rampa secuencial de un solo tono validada sobre papel blanco. Lo que no se
- * ha entrenado se deja en gris: «sin datos» no es un valor bajo, es la
- * ausencia de valor.
+ * El color lo llevan las propias piezas del cuerpo, no manchas superpuestas:
+ * cada músculo es un trozo del dibujo. Lo que la app no mide va en gris.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const RAMP = ['#DCE5F7', '#9DB6E6', '#7196DC', '#4A78D2', '#2B5AC0', '#1B3F9E'] as const;
-const EMPTY = '#E9E9E4';
-const BODY = '#F2F2EE';
-const BODY_LINE = '#E0E0DA';
-
-function fillFor(score: number | null): string {
-  if (score == null) return EMPTY;
-  const i = Math.min(RAMP.length - 1, Math.floor((score / 100) * RAMP.length));
-  return RAMP[i] as string;
-}
-
-type Shape =
-  | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number; rot?: number }
-  | { kind: 'rect'; x: number; y: number; w: number; h: number; r: number; rot?: number };
-
-type Region = { muscle: Muscle; shapes: Shape[] };
-
-/** Espejo horizontal respecto al eje del cuerpo (x = 50). */
-function mirror(s: Shape): Shape {
-  if (s.kind === 'ellipse') return { ...s, cx: 100 - s.cx, rot: s.rot ? -s.rot : undefined };
-  return { ...s, x: 100 - s.x - s.w, rot: s.rot ? -s.rot : undefined };
-}
-
-/** Un grupo y su reflejo, que es como se dibuja casi todo el cuerpo. */
-function pair(muscle: Muscle, shapes: Shape[]): Region {
-  return { muscle, shapes: [...shapes, ...shapes.map(mirror)] };
-}
-
-const FRONT: Region[] = [
-  pair('hombro', [{ kind: 'ellipse', cx: 31, cy: 36, rx: 7, ry: 8 }]),
-  pair('pecho', [{ kind: 'rect', x: 37, y: 32, w: 12, h: 20, r: 5 }]),
-  pair('biceps', [{ kind: 'ellipse', cx: 26, cy: 60, rx: 5, ry: 11 }]),
-  pair('abdomen', [{ kind: 'rect', x: 41.5, y: 56, w: 8, h: 34, r: 3.5 }]),
-  pair('aductor', [{ kind: 'ellipse', cx: 45, cy: 116, rx: 4.5, ry: 16 }]),
-  pair('cuadriceps', [{ kind: 'ellipse', cx: 39.5, cy: 122, rx: 7, ry: 26 }]),
-  pair('gemelo', [{ kind: 'ellipse', cx: 39, cy: 176, rx: 5.5, ry: 16 }]),
+/** Escala térmica, de menos a más entrenado: azul frío → rojo. */
+const RAMP: [number, [number, number, number]][] = [
+  [0.0, [40, 84, 178]],
+  [0.18, [56, 146, 212]],
+  [0.36, [74, 190, 184]],
+  [0.52, [138, 198, 88]],
+  [0.68, [232, 199, 62]],
+  [0.84, [232, 142, 50]],
+  [1.0, [206, 62, 52]],
 ];
 
-const BACK: Region[] = [
-  pair('hombro', [{ kind: 'ellipse', cx: 31, cy: 36, rx: 7, ry: 8 }]),
-  pair('espalda', [
-    { kind: 'rect', x: 36, y: 31, w: 13, h: 24, r: 5 },
-    { kind: 'ellipse', cx: 42, cy: 66, rx: 8, ry: 13 },
-  ]),
-  pair('triceps', [{ kind: 'ellipse', cx: 26, cy: 60, rx: 5, ry: 11 }]),
-  pair('gluteo', [{ kind: 'ellipse', cx: 43.5, cy: 98, rx: 8, ry: 9 }]),
-  pair('femoral', [{ kind: 'ellipse', cx: 40, cy: 128, rx: 7, ry: 22 }]),
-  pair('gemelo', [{ kind: 'ellipse', cx: 39, cy: 176, rx: 5.5, ry: 16 }]),
-];
-
-/** Piezas del cuerpo, en gris muy claro, para apoyar las manchas. */
-const FIGURE: Shape[] = [
-  { kind: 'ellipse', cx: 50, cy: 13, rx: 8, ry: 9 },
-  { kind: 'rect', x: 46.5, y: 21, w: 7, h: 8, r: 2 },
-  { kind: 'rect', x: 33, y: 28, w: 34, h: 34, r: 9 },
-  { kind: 'rect', x: 37, y: 56, w: 26, h: 36, r: 8 },
-  { kind: 'rect', x: 35, y: 86, w: 30, h: 22, r: 8 },
-  { kind: 'ellipse', cx: 26, cy: 60, rx: 6, ry: 18 },
-  { kind: 'ellipse', cx: 74, cy: 60, rx: 6, ry: 18 },
-  { kind: 'ellipse', cx: 23, cy: 88, rx: 4.5, ry: 15 },
-  { kind: 'ellipse', cx: 77, cy: 88, rx: 4.5, ry: 15 },
-  { kind: 'ellipse', cx: 40, cy: 126, rx: 9, ry: 31 },
-  { kind: 'ellipse', cx: 60, cy: 126, rx: 9, ry: 31 },
-  { kind: 'ellipse', cx: 39, cy: 178, rx: 6.5, ry: 22 },
-  { kind: 'ellipse', cx: 61, cy: 178, rx: 6.5, ry: 22 },
-  { kind: 'rect', x: 34, y: 197, w: 10, h: 6, r: 3 },
-  { kind: 'rect', x: 56, y: 197, w: 10, h: 6, r: 3 },
-];
-
-function Piece({ shape, ...rest }: { shape: Shape } & Record<string, unknown>) {
-  const transform =
-    shape.rot != null
-      ? `rotate(${shape.rot} ${shape.kind === 'ellipse' ? shape.cx : shape.x + shape.w / 2} ${
-          shape.kind === 'ellipse' ? shape.cy : shape.y + shape.h / 2
-        })`
-      : undefined;
-
-  return shape.kind === 'ellipse' ? (
-    <ellipse cx={shape.cx} cy={shape.cy} rx={shape.rx} ry={shape.ry} transform={transform} {...rest} />
-  ) : (
-    <rect x={shape.x} y={shape.y} width={shape.w} height={shape.h} rx={shape.r} transform={transform} {...rest} />
-  );
+/** Color de la escala para un valor de 0 a 1, interpolando entre paradas. */
+export function thermal(t: number): string {
+  const x = Math.max(0, Math.min(1, t));
+  for (let i = 0; i < RAMP.length - 1; i++) {
+    const [p0, c0] = RAMP[i] as [number, [number, number, number]];
+    const [p1, c1] = RAMP[i + 1] as [number, [number, number, number]];
+    if (x <= p1) {
+      const k = p1 === p0 ? 0 : (x - p0) / (p1 - p0);
+      const mix = c0.map((v, j) => Math.round(v + ((c1[j] as number) - v) * k));
+      return `rgb(${mix[0]} ${mix[1]} ${mix[2]})`;
+    }
+  }
+  const last = RAMP[RAMP.length - 1] as [number, [number, number, number]];
+  return `rgb(${last[1][0]} ${last[1][1]} ${last[1][2]})`;
 }
+
+/** Gris de lo que no se ha entrenado y de lo que la app no mide. */
+const UNTRAINED = '#D8D8D2';
+const NEUTRAL = '#EFEFEA';
+const NEUTRAL_LINE = '#DEDED8';
 
 export type BodyMapProps = {
   /** Puntuación 0-100 por grupo. Null = sin trabajo en el periodo. */
@@ -114,64 +63,88 @@ export type BodyMapProps = {
 export function BodyMap({ scores, selected, onSelect }: BodyMapProps) {
   const [hover, setHover] = useState<Muscle | null>(null);
 
-  const view = (regions: Region[], label: string) => (
+  const view = (pieces: Piece[], label: string) => (
     <figure className="min-w-0 flex-1">
-      <svg viewBox="0 0 100 208" className="block w-full" role="img" aria-label={`Vista ${label}`}>
-        <g fill={BODY} stroke={BODY_LINE} strokeWidth="0.7">
-          {FIGURE.map((sh, i) => (
-            <Piece key={i} shape={sh} />
-          ))}
-        </g>
+      <svg
+        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+        className="block w-full"
+        role="img"
+        aria-label={`Vista ${label} del mapa muscular`}
+      >
+        {/* El contorno va debajo: da cuerpo a lo que la app no mide y asoma
+            en los surcos entre músculos, que es lo que hace que la figura se
+            lea como un cuerpo y no como piezas sueltas. */}
+        <path d={SILHOUETTE} fill={NEUTRAL} stroke={NEUTRAL_LINE} strokeWidth="1.2" />
 
-        {regions.map((r) => {
-          const score = scores.get(r.muscle) ?? null;
-          const on = selected === r.muscle || hover === r.muscle;
+        {pieces.map((p, i) => {
+          if (!p.muscle) {
+            return <path key={i} d={p.d} fill={NEUTRAL} stroke={NEUTRAL_LINE} strokeWidth="1" />;
+          }
+          const score = scores.get(p.muscle) ?? null;
+          const on = selected === p.muscle || hover === p.muscle;
           return (
-            <g
-              key={r.muscle}
+            <path
+              key={i}
+              d={p.d}
+              fill={score == null ? UNTRAINED : thermal(score / 100)}
+              stroke={on ? '#17171A' : 'rgba(23,23,26,0.16)'}
+              strokeWidth={on ? 2 : 0.9}
               className="cursor-pointer"
-              onPointerEnter={() => setHover(r.muscle)}
+              style={{ transition: 'fill 380ms cubic-bezier(.16,1,.3,1), stroke 160ms ease' }}
+              onPointerEnter={() => setHover(p.muscle)}
               onPointerLeave={() => setHover(null)}
-              onClick={() => onSelect?.(r.muscle)}
-              fill={fillFor(score)}
-              stroke={on ? '#17171A' : 'rgba(23,23,26,0.12)'}
-              strokeWidth={on ? 1.1 : 0.5}
-              style={{ transition: 'fill 320ms cubic-bezier(.16,1,.3,1), stroke 160ms ease' }}
+              onClick={() => p.muscle && onSelect?.(p.muscle)}
             >
               <title>
-                {MUSCLE_LABEL[r.muscle]}
+                {MUSCLE_LABEL[p.muscle]}
                 {score != null ? ` · ${score} de 100` : ' · sin trabajo'}
               </title>
-              {r.shapes.map((sh, i) => (
-                <Piece key={i} shape={sh} />
-              ))}
-            </g>
+            </path>
           );
         })}
       </svg>
-      <figcaption className="mt-1 text-center text-micro text-ink-faint">{label}</figcaption>
+      <figcaption className="mt-1.5 text-center text-micro font-medium text-ink-muted">{label}</figcaption>
     </figure>
   );
 
   return (
     <div>
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         {view(FRONT, 'Delante')}
         {view(BACK, 'Detrás')}
       </div>
+      <ThermalLegend className="mt-4 border-t border-line pt-3" />
+    </div>
+  );
+}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line pt-3 text-micro text-ink-faint">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: EMPTY }} />
-          Sin trabajo
-        </span>
-        <span className="flex items-center gap-1">
-          Desatendido
-          {RAMP.map((c) => (
-            <span key={c} className="h-2.5 w-2.5 rounded-[2px]" style={{ background: c }} />
-          ))}
-          Bien cubierto
-        </span>
+/**
+ * Leyenda de la escala, rotulada como la de un mapa del tiempo: un degradado
+ * continuo con las marcas numéricas debajo. Sin las cifras, el color solo
+ * diría «más» o «menos»; con ellas se puede leer un músculo concreto.
+ */
+export function ThermalLegend({ className }: { className?: string }) {
+  const gradient = RAMP.map(([p, c]) => `rgb(${c[0]} ${c[1]} ${c[2]}) ${Math.round(p * 100)}%`).join(', ');
+
+  return (
+    <div className={className}>
+      <div className="flex items-baseline justify-between">
+        <span className="text-micro text-ink-muted">Menos entrenado</span>
+        <span className="text-micro text-ink-muted">Más entrenado</span>
+      </div>
+      <span
+        className="mt-1 block h-2.5 rounded-full"
+        style={{ background: `linear-gradient(90deg, ${gradient})` }}
+        aria-hidden
+      />
+      <div className="tnum mt-1 flex justify-between text-micro text-ink-faint">
+        {[0, 25, 50, 75, 100].map((n) => (
+          <span key={n}>{n}</span>
+        ))}
+      </div>
+      <div className="mt-2.5 flex items-center gap-1.5 text-micro text-ink-faint">
+        <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: UNTRAINED }} />
+        Sin trabajo en este periodo
       </div>
     </div>
   );
@@ -196,8 +169,12 @@ export function ComponentBar({
       <div className="mt-1 h-[5px] overflow-hidden rounded-[3px] bg-line-soft">
         {score != null && (
           <span
-            className="block h-full rounded-[3px] bg-accent"
-            style={{ width: `${score * 100}%`, transition: 'width 420ms cubic-bezier(.16,1,.3,1)' }}
+            className="block h-full rounded-[3px]"
+            style={{
+              width: `${score * 100}%`,
+              background: thermal(score),
+              transition: 'width 420ms cubic-bezier(.16,1,.3,1)',
+            }}
           />
         )}
       </div>

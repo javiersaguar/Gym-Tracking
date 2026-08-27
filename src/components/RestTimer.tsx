@@ -60,8 +60,8 @@ export function RestTimer({
   timer: RestTimerState;
   /** Qué toca después, para no perder el hilo. */
   contextLabel?: string;
-  /** Se llama con los segundos medidos al cerrar el descanso. */
-  onFinish: (elapsed: number) => void;
+  /** Se llama con los segundos medidos y la serie a la que corresponden. */
+  onFinish: (elapsed: number, slot: { exIdx: number; setIdx: number } | null) => void;
 }) {
   const { running, elapsed } = timer;
   /* A partir de cinco minutos deja de ser un descanso y pasa a ser una
@@ -96,7 +96,17 @@ export function RestTimer({
               </p>
             </div>
 
-            <Button variant="primary" buzz onClick={() => onFinish(timer.stop())} className="h-11 shrink-0 px-5">
+            <Button
+              variant="primary"
+              buzz
+              onClick={() => {
+                /* El slot hay que leerlo antes: `stop` lo borra. Y el tiempo
+                   sale de `stop`, que mira el reloj, no del último repintado. */
+                const slot = timer.slot;
+                onFinish(timer.stop(), slot);
+              }}
+              className="h-11 shrink-0 px-5"
+            >
               Listo
             </Button>
           </div>

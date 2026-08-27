@@ -47,13 +47,10 @@ const SHELL = ${JSON.stringify(assets, null, 2)};
 
 self.addEventListener('install', (event) => {
   /* Se precachea todo el build de golpe: la app tiene que poder abrirse sin
-     conexión desde la primera visita, no desde la segunda. */
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(SHELL))
-      .then(() => self.skipWaiting()),
-  );
+     conexión desde la primera visita, no desde la segunda.
+     NO se llama a skipWaiting aquí: cambiar los archivos por debajo de una
+     pestaña abierta rompe la sesión en curso. Espera a que la app avise. */
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
 });
 
 self.addEventListener('activate', (event) => {

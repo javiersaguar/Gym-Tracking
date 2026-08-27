@@ -10,31 +10,39 @@ import { MUSCLE_LABEL, type LoggedExercise, type LoggedSet } from '../lib/types'
 import { NumberField } from './NumberField';
 import { Button, Pill, cx } from './ui';
 
-/** Círculo de confirmación de la serie. Es el objetivo táctil más pulsado de
- *  la app, así que ocupa 44 px reales aunque el dibujo sea más pequeño. */
+/**
+ * Botón de confirmar la serie.
+ *
+ * Antes era una casilla con un tic y no se entendía qué hacía. Ahora es un
+ * botón con su verbo escrito, del ancho del contenido, y cambia de palabra al
+ * marcarse: «Hecha» con el tic relleno. Es el objetivo más pulsado de la app
+ * y no puede depender de adivinar qué significa un icono.
+ */
 function DoneButton({ done, onToggle }: { done: boolean; onToggle: () => void }) {
   return (
     <button
       onClick={onToggle}
-      aria-label={done ? 'Deshacer serie' : 'Marcar serie'}
+      aria-label={done ? 'Deshacer serie' : 'Marcar serie como hecha'}
       aria-pressed={done}
       className={cx(
-        'pressable grid h-12 w-12 shrink-0 place-items-center rounded-lg border transition-colors duration-press',
+        'pressable inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-caption font-medium',
+        'transition-colors duration-press',
         done
           ? 'border-accent bg-accent text-paper'
-          : 'border-line bg-paper text-ink-faint hover:border-line-strong hover:text-ink-muted',
+          : 'border-accent/35 bg-accent-wash text-accent-deep hover:border-accent/60 hover:bg-accent/12',
       )}
     >
-      <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4">
+      <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2">
         <motion.path
-          d="M4.5 10.5l3.6 3.6 7.4-8.2"
+          d="M4.6 10.4l3.5 3.5 7.2-8"
           strokeLinecap="round"
           strokeLinejoin="round"
           initial={false}
-          animate={{ pathLength: done ? 1 : 0.001, opacity: done ? 1 : 0.45 }}
-          transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+          animate={{ pathLength: done ? 1 : 0.001, opacity: done ? 1 : 0.5 }}
+          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
         />
       </svg>
+      {done ? 'Hecha' : 'Marcar'}
     </button>
   );
 }
@@ -42,9 +50,9 @@ function DoneButton({ done, onToggle }: { done: boolean; onToggle: () => void })
 /**
  * Selector de repeticiones en la recámara.
  *
- * Siempre visible, no escondido tras un menú: es el dato que separa «7 y
- * podía con dos más» de «7 y me morí», y sin él no hay forma de saber si una
- * sesión floja fue falta de fuerza o falta de ganas. Cinco botones, un toque.
+ * Con su etiqueta escrita entera —«¿Cuántas te quedaban?»— porque «RIR» a
+ * secas no dice nada si no lo tienes en la cabeza. Cinco botones, un toque, y
+ * volver a tocar el mismo lo borra.
  */
 const RIR_OPTIONS = [0, 1, 2, 3, 4] as const;
 
@@ -58,9 +66,18 @@ function RirPicker({
   setNumber: number;
 }) {
   return (
-    <div className="flex items-center gap-1.5 pl-6 pr-1">
-      <span className="w-9 shrink-0 text-micro text-ink-faint">RIR</span>
-      <div className="flex flex-1 gap-1" role="group" aria-label={`Repeticiones en recámara de la serie ${setNumber}`}>
+    <div className="mt-2 rounded-lg border border-line bg-canvas px-2.5 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-micro text-ink-muted">
+          RIR <span className="text-ink-faint">· ¿cuántas te quedaban?</span>
+        </span>
+        {value != null && <span className="tnum text-micro font-medium text-accent">{value === 4 ? '4+' : value}</span>}
+      </div>
+      <div
+        className="mt-1.5 flex gap-1"
+        role="group"
+        aria-label={`Repeticiones en recámara de la serie ${setNumber}`}
+      >
         {RIR_OPTIONS.map((n) => {
           const active = value === n;
           return (
@@ -74,10 +91,10 @@ function RirPicker({
                 onPick(active ? null : n);
               }}
               className={cx(
-                'pressable h-7 flex-1 rounded-md border text-micro font-medium transition-colors duration-press',
+                'pressable h-8 flex-1 rounded-md border text-caption font-medium transition-colors duration-press',
                 active
                   ? 'border-accent bg-accent text-paper'
-                  : 'border-line bg-paper text-ink-faint hover:border-line-strong hover:text-ink',
+                  : 'border-line bg-paper text-ink-muted hover:border-accent/40 hover:text-ink',
               )}
             >
               {n === 4 ? '4+' : n}
@@ -86,6 +103,43 @@ function RirPicker({
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * Descanso medido, entre una serie y la siguiente.
+ *
+ * Aparece en cuanto paras el cronómetro y se queda ahí: al mirar la tarjeta
+ * después se ve el ritmo real del ejercicio sin abrir nada. Entra con doce
+ * píxeles y una curva larga, que es movimiento suficiente para que se note
+ * que ha aparecido algo sin robar la atención.
+ */
+function RestDivider({ seconds }: { seconds: number }) {
+  const long = seconds >= 300;
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+      className="flex items-center gap-2 px-1 py-1.5"
+    >
+      <span className="h-px flex-1 bg-line" />
+      <span
+        className={cx(
+          'tnum inline-flex items-center gap-1 rounded-full border px-2 py-[3px] text-micro font-medium',
+          long ? 'border-warn-ink/25 bg-warn-wash text-warn-ink' : 'border-line bg-canvas text-ink-muted',
+        )}
+      >
+        <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="10" cy="11" r="6" />
+          <path d="M10 8.2V11l1.8 1.1M8.2 3h3.6" strokeLinecap="round" />
+        </svg>
+        {clock(seconds)}
+      </span>
+      <span className="h-px flex-1 bg-line" />
+    </motion.div>
   );
 }
 
@@ -121,52 +175,18 @@ function SetRow({
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className={cx(
-        'rounded-lg py-1.5',
-        set.done && 'bg-accent-wash/60',
-        isPr && 'animate-flash-pr',
-      )}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className={cx('rounded-lg px-1 py-2', set.done && 'bg-accent-wash/55', isPr && 'animate-flash-pr')}
     >
-      <div className="flex items-center gap-1.5">
-      <div className="w-5 shrink-0 text-center">
-        <span
-          className={cx(
-            'tnum text-caption font-medium',
-            set.done ? 'text-accent' : 'text-ink-faint',
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className={cx('text-caption font-medium', set.done ? 'text-accent-deep' : 'text-ink')}>
+          Serie {index + 1}
+          {ref && (
+            <span className="tnum ml-2 font-normal text-ink-faint">
+              antes {String(ref.weight).replace('.', ',')} × {ref.reps}
+            </span>
           )}
-        >
-          {index + 1}
         </span>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <NumberField
-          noun="peso"
-          context={`la serie ${index + 1}`}
-          value={set.weight}
-          onChange={(v) => patchSet(exIdx, index, { weight: v })}
-          step={weightStep}
-          max={500}
-          decimals={1}
-          placeholder={ref ? String(ref.weight).replace('.', ',') : '0'}
-        />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <NumberField
-          noun="repeticiones"
-          context={`la serie ${index + 1}`}
-          value={set.reps}
-          onChange={(v) => patchSet(exIdx, index, { reps: v })}
-          step={1}
-          max={100}
-          decimals={0}
-          tone={set.reps > 0 && inRange ? 'accent' : 'default'}
-          placeholder={ref ? String(ref.reps) : String(low)}
-        />
-      </div>
-
         <DoneButton
           done={set.done}
           onToggle={() => {
@@ -180,17 +200,37 @@ function SetRow({
         />
       </div>
 
-      <div className="mt-1.5">
-        <RirPicker
-          value={set.rir}
-          setNumber={index + 1}
-          onPick={(v) => setRir(exIdx, index, v)}
-        />
+      <div className="flex items-stretch gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="label mb-1 block text-center">kg</span>
+          <NumberField
+            noun="peso"
+            context={`la serie ${index + 1}`}
+            value={set.weight}
+            onChange={(v) => patchSet(exIdx, index, { weight: v })}
+            step={weightStep}
+            max={500}
+            decimals={1}
+            placeholder={ref ? String(ref.weight).replace('.', ',') : '0'}
+          />
+        </label>
+        <label className="min-w-0 flex-1">
+          <span className="label mb-1 block text-center">reps</span>
+          <NumberField
+            noun="repeticiones"
+            context={`la serie ${index + 1}`}
+            value={set.reps}
+            onChange={(v) => patchSet(exIdx, index, { reps: v })}
+            step={1}
+            max={100}
+            decimals={0}
+            tone={set.reps > 0 && inRange ? 'accent' : 'default'}
+            placeholder={ref ? String(ref.reps) : String(low)}
+          />
+        </label>
       </div>
 
-      {set.done && set.restSec != null && (
-        <p className="tnum mt-1 pl-6 text-micro text-ink-faint">Descanso previo {clock(set.restSec)}</p>
-      )}
+      <RirPicker value={set.rir} setNumber={index + 1} onPick={(v) => setRir(exIdx, index, v)} />
     </motion.div>
   );
 }
@@ -224,8 +264,8 @@ export function ExerciseCard({
     const set = exercise.sets[setIdx];
     if (!set) return;
     if (set.reps <= 0) {
-      /* Marcar una serie vacía no confirma nada: se pone el foco donde falta
-         el dato en vez de guardar un cero. */
+      /* Marcar una serie vacía no confirma nada: se avisa con una vibración
+         doble en vez de guardar un cero que ensucie el tonelaje. */
       haptic([14, 60, 14]);
       return;
     }
@@ -242,10 +282,7 @@ export function ExerciseCard({
   return (
     <motion.section
       layout="position"
-      className={cx(
-        'card overflow-hidden transition-opacity duration-panel',
-        exercise.skipped && 'opacity-45',
-      )}
+      className={cx('card overflow-hidden transition-opacity duration-panel', exercise.skipped && 'opacity-45')}
     >
       <header className="flex items-start gap-3 px-4 pb-3 pt-4">
         <div className="min-w-0 flex-1">
@@ -253,16 +290,14 @@ export function ExerciseCard({
             <h3 className="truncate text-title font-medium text-ink">{exercise.name}</h3>
             {complete && !exercise.skipped && (
               <motion.span
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.94, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', bounce: 0.3, duration: 0.32 }}
+                transition={{ type: 'spring', bounce: 0.28, duration: 0.34 }}
               >
                 <Pill tone="accent">Hecho</Pill>
               </motion.span>
             )}
           </div>
-          {/* Una sola cadena: con separadores en elementos aparte, al saltar
-              de línea se queda una viñeta huérfana al final. */}
           <p className="mt-1 truncate text-micro text-ink-muted">
             {exercise.muscles.map((m) => MUSCLE_LABEL[m.muscle]).join(' · ')}
           </p>
@@ -283,7 +318,7 @@ export function ExerciseCard({
       </header>
 
       {refLabel && !exercise.skipped && (
-        <div className="mx-4 mb-2 flex items-center gap-2 border-t border-line pt-2">
+        <div className="mx-4 mb-1 flex items-center gap-2 border-t border-line pt-2">
           <span className="label">{reference?.source === 'hoja' ? 'De la hoja' : 'Última vez'}</span>
           <span className="tnum truncate text-micro text-ink-muted">{refLabel}</span>
         </div>
@@ -291,37 +326,31 @@ export function ExerciseCard({
 
       {!exercise.skipped && (
         <>
-          {/* Cabecera de columnas: así el número va limpio, sin una unidad
-              encima que se solape con las cifras de tres dígitos. */}
-          <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-1">
-            <span className="w-5 shrink-0" />
-            <span className="label flex-1 text-center">kg</span>
-            <span className="label flex-1 text-center">reps</span>
-            <span className="w-12 shrink-0" />
-          </div>
-
-          <div className="space-y-1 px-3 pb-1">
+          <div className="px-3 pb-1">
             <AnimatePresence initial={false}>
               {exercise.sets.map((set, i) => (
-                <SetRow
-                  key={set.id}
-                  set={set}
-                  index={i}
-                  exIdx={exIdx}
-                  exercise={exercise}
-                  reference={reference}
-                  weightStep={weightStep}
-                  isPr={justPr === set.id}
-                  onDone={handleDone}
-                  rowRef={registerRow ? (el) => registerRow(exIdx, i, el) : undefined}
-                />
+                <div key={set.id}>
+                  {/* El descanso medido va justo donde ocurrió: entre la serie
+                      anterior y esta. */}
+                  {i > 0 && set.restSec != null && <RestDivider seconds={set.restSec} />}
+                  <SetRow
+                    set={set}
+                    index={i}
+                    exIdx={exIdx}
+                    exercise={exercise}
+                    reference={reference}
+                    weightStep={weightStep}
+                    isPr={justPr === set.id}
+                    onDone={handleDone}
+                    rowRef={registerRow ? (el) => registerRow(exIdx, i, el) : undefined}
+                  />
+                </div>
               ))}
             </AnimatePresence>
           </div>
 
-          {/* Quitar afecta a la última serie: es como se piensa («hoy hago
-              una menos»), y evita meter una equis en cada fila cuando el
-              ancho de un móvil ya va justo. */}
+          {/* Quitar afecta a la última serie: es como se piensa («hoy hago una
+              menos»), y evita meter una equis en cada fila. */}
           <div className="flex gap-2 px-4 pb-4 pt-2">
             <Button
               size="sm"
@@ -334,7 +363,7 @@ export function ExerciseCard({
               className="border border-dashed border-line px-3 text-ink-faint hover:border-line-strong hover:text-ink"
             >
               <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4.5 10h11" strokeLinecap="round" />
+                <path d="M4.8 10h10.4" strokeLinecap="round" />
               </svg>
               Quitar
             </Button>
@@ -349,7 +378,7 @@ export function ExerciseCard({
               className="border border-dashed border-line text-ink-faint hover:border-line-strong hover:text-ink"
             >
               <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
+                <path d="M10 4.8v10.4M4.8 10h10.4" strokeLinecap="round" />
               </svg>
               Añadir serie
             </Button>
@@ -358,9 +387,7 @@ export function ExerciseCard({
       )}
 
       {exercise.skipped && (
-        <p className="px-4 pb-4 text-caption text-ink-faint">
-          Fuera del entreno de hoy. La rutina no cambia.
-        </p>
+        <p className="px-4 pb-4 text-caption text-ink-faint">Fuera del entreno de hoy. La rutina no cambia.</p>
       )}
     </motion.section>
   );

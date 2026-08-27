@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { haptic } from '../lib/hooks';
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
@@ -484,6 +484,63 @@ export function OriginPanel({
             {children}
           </motion.div>
         </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+
+/* ── Aviso de versión nueva ──────────────────────────────────────────────── */
+
+/**
+ * Barra que aparece cuando el service worker ha descargado una versión nueva.
+ *
+ * Sin esto, un móvil con la app ya instalada seguía sirviendo la copia vieja
+ * de la caché indefinidamente: se desplegaban cambios que no llegaban nunca a
+ * la pantalla. No se recarga sola a propósito — hacerlo a mitad de un entreno
+ * sería perder el hilo justo cuando menos apetece.
+ */
+export function UpdateBanner() {
+  const [apply, setApply] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    const onUpdate = (e: Event) => {
+      const fn = (e as CustomEvent<() => void>).detail;
+      setApply(() => fn);
+    };
+    window.addEventListener('app-update', onUpdate);
+    return () => window.removeEventListener('app-update', onUpdate);
+  }, []);
+
+  return (
+    <AnimatePresence>
+      {apply && (
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ type: 'spring', bounce: 0.14, duration: 0.4 }}
+          className="fixed inset-x-0 top-0 z-[70] safe-top px-4 pb-2"
+        >
+          <div className="mx-auto flex max-w-lg items-center gap-3 rounded-xl border border-accent/30 bg-paper px-4 py-3 shadow-float">
+            <span className="min-w-0 flex-1 text-caption text-ink">
+              <span className="font-medium">Hay una versión nueva.</span>{' '}
+              <span className="text-ink-muted">Se aplica al recargar.</span>
+            </span>
+            <Button size="sm" variant="primary" onClick={apply}>
+              Actualizar
+            </Button>
+            <button
+              onClick={() => setApply(null)}
+              aria-label="Ahora no"
+              className="pressable grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-faint hover:bg-sunken hover:text-ink"
+            >
+              <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

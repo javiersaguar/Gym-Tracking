@@ -19,15 +19,21 @@ no hay servidor, ni cuenta, ni red que se pueda caer a mitad de una serie.
   serie y lo paras tú cuando vas a la siguiente. Sin objetivo que cumplir: en un gimnasio lleno el
   descanso lo decide la cola de la prensa. El tiempo se calcula desde el instante de arranque, así que
   no se pierde un segundo aunque bloquees el móvil o el sistema mate la app en segundo plano.
-- **RIR en cada serie.** Un toque para apuntar cuántas repeticiones te quedaban. Es lo que separa «7 y
-  podía con dos más» de «7 y me morí», y lo que permite saber si una sesión floja fue falta de fuerza
-  o falta de ganas.
+- **RIR en cada serie.** Un toque para apuntar cuántas repeticiones te quedaban, con la pregunta
+  escrita entera al lado. Es lo que separa «7 y podía con dos más» de «7 y me morí», y lo que permite
+  saber si una sesión floja fue falta de fuerza o falta de ganas.
+- **El descanso se queda escrito entre serie y serie.** Al parar el cronómetro, el tiempo medido
+  aparece justo donde ocurrió y se queda ahí: al mirar la tarjeta después se ve el ritmo real del
+  ejercicio sin abrir nada.
+- **Aviso de versión nueva.** Cuando se despliega una actualización, la app lo dice y la aplica al
+  recargar. Sin eso, un móvil con la app instalada seguía sirviendo la copia vieja de la caché.
 - **Análisis al cerrar el entreno.** Índice de progreso por grupo muscular, récords batidos, lectura de
   qué ha pasado y qué peso tocar la próxima vez en cada ejercicio.
 - **Progreso, en cuatro vistas** y con el tramo de días que elijas (7, 14, 30, 90 o un año):
-  - **Mapa** — dos siluetas con un mapa de calor por grupo muscular. El color no son los kilos: es cómo
-    de atendido está el grupo, mezclando volumen semanal, frecuencia, RIR y progreso. Se toca un
-    músculo y se ve el desglose de los cuatro componentes.
+  - **Mapa** — dos láminas anatómicas, de frente y de espalda, donde **cada músculo es una pieza del
+    dibujo** y se colorea él, no una mancha encima. Escala térmica como la de un mapa del tiempo: azul
+    lo menos entrenado, rojo lo más. El color no son los kilos: es cómo de atendido está el grupo,
+    mezclando volumen semanal, frecuencia, RIR y progreso. Se toca un músculo y se ve el desglose.
   - **Kilos** — tonelaje total por músculo y por ejercicio, desde series × repeticiones × peso.
   - **Fuerza** — evolución del 1RM estimado, tonelaje sesión a sesión y **tabla de récords por
     repetición** (mejor peso a 5, a 8, a 10…) de cada ejercicio.
@@ -173,6 +179,16 @@ color a cada uno gastaría el canal de identidad en repetir lo que ya dice la lo
 identidad la lleva la etiqueta, escrita siempre al lado. La rampa azul secuencial está validada contra
 el papel (lightness monótona, saltos visibles, extremo claro por encima de 2:1 de contraste), y todo el
 texto cumple 4,5:1 de contraste mínimo.
+
+El mapa de calor es la excepción, y es deliberada: usa escala térmica en vez de la rampa azul. El
+arcoíris tiene mala fama en visualización porque el orden de los tonos no es evidente, pero en un mapa
+corporal la convención meteorológica ya la sabe leer cualquiera. Se compensa por tres vías: los tonos
+van además de oscuro a claro y de vuelta a saturado, cada músculo lleva su cifra escrita en la lista de
+al lado, y la leyenda es un degradado continuo rotulado de 0 a 100.
+
+La anatomía (`src/components/anatomy.ts`) no se escribe como curvas Bézier a mano: cada pieza se
+declara como una tabla de anchuras a distintas alturas y el trazo se genera interpolando. Ajustar
+puntos de control a ciegas daba muñecos de jengibre; así la forma es un dato que se lee y se corrige.
 
 Las skills de diseño que guían todo esto están en `.claude/skills/`: `minimalist-skill` y
 `redesign-skill` para el sistema visual, `apple-design` y `emil-design-eng` para el movimiento y el

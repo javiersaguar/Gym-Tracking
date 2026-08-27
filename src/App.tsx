@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useState } from 'react';
 import { BottomNav, TopBar } from './components/BottomNav';
-import { Button, Empty, Toast } from './components/ui';
+import { Button, Empty, Toast, UpdateBanner } from './components/ui';
 import { startSession } from './lib/actions';
 import { useRoute, useStore } from './lib/hooks';
 import { Ajustes } from './screens/Ajustes';
@@ -166,6 +166,7 @@ export default function App() {
 
       <BottomNav path={path} onNavigate={navigate} hidden={bare} />
       <Toast message={toast} onDone={clearToast} />
+      <UpdateBanner />
     </div>
   );
 }

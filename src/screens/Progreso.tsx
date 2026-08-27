@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
-import { BodyMap, ComponentBar } from '../components/BodyMap';
+import { BodyMap, ComponentBar, thermal } from '../components/BodyMap';
 import { BarList, Spark, TrendLine, type BarDatum } from '../components/charts';
 import { MiniBars, RestScatter } from '../components/charts-extra';
 import { Card, Empty, Pill, SectionTitle, Segmented, Stat, cx } from '../components/ui';
@@ -194,10 +194,16 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                 <span className="tnum w-9 shrink-0 text-right text-caption font-medium text-ink">
                   {s.score ?? '—'}
                 </span>
+                {/* La barra usa el mismo color que el mapa: si un músculo
+                    sale verde arriba, aquí sale verde también. */}
                 <span className="h-[6px] w-16 shrink-0 overflow-hidden rounded-[3px] bg-line-soft">
                   <span
-                    className="block h-full rounded-[3px] bg-accent"
-                    style={{ width: `${s.score ?? 0}%`, transition: 'width 420ms cubic-bezier(.16,1,.3,1)' }}
+                    className="block h-full rounded-[3px]"
+                    style={{
+                      width: `${s.score ?? 0}%`,
+                      background: s.score == null ? 'transparent' : thermal(s.score / 100),
+                      transition: 'width 420ms cubic-bezier(.16,1,.3,1)',
+                    }}
                   />
                 </span>
               </button>
