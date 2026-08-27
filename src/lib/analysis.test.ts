@@ -6,9 +6,9 @@ import { DEFAULT_SETTINGS } from './storage';
 import type { LoggedExercise, LoggedSet, Session, Store } from './types';
 
 let counter = 0;
-function set(weight: number, reps: number, restSec: number | null = 120): LoggedSet {
+function set(weight: number, reps: number, restSec: number | null = 120, rir: number | null = null): LoggedSet {
   counter += 1;
-  return { id: `s${counter}`, weight, reps, restSec, at: 0, done: true, rir: null };
+  return { id: `s${counter}`, weight, reps, restSec, at: 0, done: true, rir };
 }
 
 function exercise(id: string, sets: LoggedSet[], repRange: [number, number] = [6, 10]): LoggedExercise {
@@ -17,7 +17,6 @@ function exercise(id: string, sets: LoggedSet[], repRange: [number, number] = [6
     name: id,
     muscles: [{ muscle: 'espalda', share: 1 }],
     loadKind: 'peso',
-    targetRest: 120,
     repRange,
     sets,
     skipped: false,
@@ -69,6 +68,12 @@ describe('consejo del próximo entreno', () => {
     const a = advice([set(40, 10), set(40, 10)], [6, 10]);
     expect(a?.text).toContain('6-7');
   });
+
+  it('manda subir si ni la serie más dura bajó de RIR 3', () => {
+    const a = advice([set(40, 8, 120, 3), set(40, 8, 120, 4)]);
+    expect(a?.move).toBe('sube');
+    expect(a?.text).toContain('RIR');
+  });
 });
 
 describe('veredicto', () => {
@@ -104,10 +109,25 @@ describe('avisos', () => {
     expect(a.notes.some((n) => n.kind === 'watch' && n.text.includes('40 %'))).toBe(true);
   });
 
-  it('avisa cuando el descanso se va muy por encima del objetivo', () => {
-    const largo = (id: string) => exercise(id, [set(40, 8, 300), set(40, 8, 300)]);
-    const a = analyse(session('hoy', T0, [largo('remo'), largo('jalon')]), []);
-    expect(a.notes.some((n) => n.text.includes('más de lo previsto'))).toBe(true);
+  it('cuenta el rango de descansos cuando fue muy dispar', () => {
+    const ex = exercise('remo', [set(40, 8, 45), set(40, 8, 300), set(40, 7, 60), set(40, 7, 280)]);
+    const a = analyse(session('hoy', T0, [ex]), []);
+    expect(a.notes.some((n) => n.text.includes('descansos fueron de'))).toBe(true);
+  });
+
+  it('separa el descanso de la mejora real al comparar', () => {
+    const previa = session('h1', T0 - DAY, [exercise('remo', [set(40, 8, 90, 0), set(40, 8, 90, 0)])]);
+    /* Mismo trabajo, el doble de descanso y al fallo: el descanso explica
+       la diferencia y hay que decirlo con esas palabras. */
+    const hoy = session('hoy', T0, [exercise('remo', [set(40, 8, 240, 0), set(40, 8, 240, 0)])]);
+    const a = analyse(hoy, [previa]);
+    expect(a.attribution).not.toBeNull();
+    expect(a.notes.some((n) => n.text.includes('descansaste'))).toBe(true);
+  });
+
+  it('avisa si el RIR medio dice que no se apretó', () => {
+    const a = analyse(session('hoy', T0, [exercise('remo', [set(40, 8, 120, 4), set(40, 8, 120, 4)])]), []);
+    expect(a.notes.some((n) => n.text.includes('margen'))).toBe(true);
   });
 
   it('avisa del parón largo desde el entreno anterior', () => {

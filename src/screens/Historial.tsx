@@ -44,7 +44,7 @@ export function Historial({ store, onOpen }: { store: Store; onOpen: (id: string
     return (
       <Empty
         title="Sin entrenos guardados"
-        body="Cada sesión que cierres queda aquí con su análisis completo, y se puede volver a abrir cuando quieras."
+        body="Cada sesión que cierres queda aquí con su análisis: índice, récords y el reparto entre descanso y mejora real."
       />
     );
   }
@@ -52,7 +52,7 @@ export function Historial({ store, onOpen }: { store: Store; onOpen: (id: string
   return (
     <div className="space-y-8 pb-8">
       <header>
-        <h1 className="font-display text-display-lg">Historial</h1>
+        <h1 className="font-display text-display-lg">Análisis</h1>
         <p className="tnum mt-3 text-caption text-ink-muted">
           {plural(totals.count, 'entreno')} · {tonnage(totals.tonnage)} movidos · {duration(totals.time)} de gimnasio
         </p>
@@ -82,7 +82,7 @@ export function Historial({ store, onOpen }: { store: Store; onOpen: (id: string
           >
             <button
               onClick={() => onOpen(r.session.id)}
-              className="flex w-full items-center gap-4 border-b border-line py-4 text-left transition-colors duration-press hover:bg-paper"
+              className="group flex w-full items-center gap-4 border-b border-line py-4 text-left transition-colors duration-press hover:bg-paper"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -91,7 +91,9 @@ export function Historial({ store, onOpen }: { store: Store; onOpen: (id: string
                   </span>
                   {r.session.feel != null && <ScaleDots value={r.session.feel} />}
                 </div>
-                <p className="mt-1 truncate text-body-lg font-medium text-ink">{r.session.dayName}</p>
+                <p className="mt-1 truncate text-body-lg font-medium text-ink transition-colors duration-panel group-hover:text-accent">
+                  {r.session.dayName}
+                </p>
                 <p className="tnum mt-1 truncate text-micro text-ink-muted">
                   {tonnage(r.stats.tonnage)} · {plural(r.stats.sets, 'serie')} · {duration(r.stats.durationSec)}
                 </p>

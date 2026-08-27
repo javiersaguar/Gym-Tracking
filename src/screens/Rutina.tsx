@@ -1,14 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { Button, Card, Pill, SectionTitle, Sheet, cx } from '../components/ui';
-import {
-  addExerciseToDay,
-  moveExerciseInDay,
-  removeExerciseFromDay,
-  setPlannedSets,
-  setTargetRest,
-} from '../lib/actions';
-import { clock, plural } from '../lib/format';
+import { addExerciseToDay, moveExerciseInDay, removeExerciseFromDay, setPlannedSets } from '../lib/actions';
+import { plural } from '../lib/format';
 import { haptic } from '../lib/hooks';
 import { CATALOG_IDS, catalogName } from '../lib/routine';
 import { MUSCLE_LABEL, type Day, type Store } from '../lib/types';
@@ -29,11 +23,11 @@ export function Rutina({
 
   const day = days.find((d) => d.id === dayId) ?? (days[0] as Day);
   const totalSets = day.exercises.reduce((a, e) => a + e.plannedSets, 0);
-  const estimated = useMemo(
-    () =>
-      day.exercises.reduce((a, e) => a + e.plannedSets * (e.targetRest + 40), 0),
-    [day],
-  );
+
+  /* Estimación grosera de duración: unos dos minutos y medio por serie entre
+     trabajo y descanso. No hay descanso configurado que consultar —lo decide
+     el gimnasio— así que esto es una orientación, no una promesa. */
+  const estimated = useMemo(() => totalSets * 150, [totalSets]);
 
   return (
     <div className="space-y-8 pb-8">
@@ -147,22 +141,14 @@ export function Rutina({
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3">
                       <Adjuster
-                        label="Series"
+                        label="Series previstas"
                         value={String(ex.plannedSets)}
                         onDown={() => setPlannedSets(day.id, i, ex.plannedSets - 1)}
                         onUp={() => setPlannedSets(day.id, i, ex.plannedSets + 1)}
                         downDisabled={ex.plannedSets <= 1}
                         upDisabled={ex.plannedSets >= 10}
-                      />
-                      <Adjuster
-                        label="Descanso"
-                        value={clock(ex.targetRest)}
-                        onDown={() => setTargetRest(day.id, i, ex.targetRest - 15)}
-                        onUp={() => setTargetRest(day.id, i, ex.targetRest + 15)}
-                        downDisabled={ex.targetRest <= 15}
-                        upDisabled={ex.targetRest >= 600}
                       />
                     </div>
 
@@ -184,8 +170,8 @@ export function Rutina({
           </Button>
 
           <p className="max-w-md text-micro text-ink-faint">
-            Los cambios aquí valen para los próximos entrenos. Las sesiones ya guardadas conservan lo que hiciste ese
-            día.
+            Los cambios aquí valen para los próximos entrenos; las sesiones ya guardadas conservan lo que hiciste ese
+            día. El descanso no se configura: lo cronometras en el entreno y la app descuenta su efecto al comparar.
           </p>
         </>
       )}

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
-import { addSet, patchSet, removeSet, toggleSkip, uncompleteSet } from '../lib/actions';
+import { addSet, patchSet, removeSet, setRir, toggleSkip, uncompleteSet } from '../lib/actions';
 import { clock } from '../lib/format';
 import { haptic } from '../lib/hooks';
 import { e1RM } from '../lib/metrics';
@@ -39,6 +39,56 @@ function DoneButton({ done, onToggle }: { done: boolean; onToggle: () => void })
   );
 }
 
+/**
+ * Selector de repeticiones en la recámara.
+ *
+ * Siempre visible, no escondido tras un menú: es el dato que separa «7 y
+ * podía con dos más» de «7 y me morí», y sin él no hay forma de saber si una
+ * sesión floja fue falta de fuerza o falta de ganas. Cinco botones, un toque.
+ */
+const RIR_OPTIONS = [0, 1, 2, 3, 4] as const;
+
+function RirPicker({
+  value,
+  onPick,
+  setNumber,
+}: {
+  value: number | null;
+  onPick: (v: number | null) => void;
+  setNumber: number;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 pl-6 pr-1">
+      <span className="w-9 shrink-0 text-micro text-ink-faint">RIR</span>
+      <div className="flex flex-1 gap-1" role="group" aria-label={`Repeticiones en recámara de la serie ${setNumber}`}>
+        {RIR_OPTIONS.map((n) => {
+          const active = value === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              aria-pressed={active}
+              aria-label={n === 4 ? '4 o más repeticiones en recámara' : `${n} repeticiones en recámara`}
+              onClick={() => {
+                haptic(8);
+                onPick(active ? null : n);
+              }}
+              className={cx(
+                'pressable h-7 flex-1 rounded-md border text-micro font-medium transition-colors duration-press',
+                active
+                  ? 'border-accent bg-accent text-paper'
+                  : 'border-line bg-paper text-ink-faint hover:border-line-strong hover:text-ink',
+              )}
+            >
+              {n === 4 ? '4+' : n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function SetRow({
   set,
   index,
@@ -48,6 +98,7 @@ function SetRow({
   weightStep,
   isPr,
   onDone,
+  rowRef,
 }: {
   set: LoggedSet;
   index: number;
@@ -57,6 +108,7 @@ function SetRow({
   weightStep: number;
   isPr: boolean;
   onDone: (setIdx: number) => void;
+  rowRef?: (el: HTMLDivElement | null) => void;
 }) {
   const ref = reference?.sets[index];
   const [low, high] = exercise.repRange;
@@ -64,17 +116,19 @@ function SetRow({
 
   return (
     <motion.div
+      ref={rowRef}
       layout="position"
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
-      transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className={cx(
-        'flex items-center gap-1.5 rounded-xl py-1',
-        set.done && 'bg-canvas',
+        'rounded-lg py-1.5',
+        set.done && 'bg-accent-wash/60',
         isPr && 'animate-flash-pr',
       )}
     >
+      <div className="flex items-center gap-1.5">
       <div className="w-5 shrink-0 text-center">
         <span
           className={cx(
@@ -113,17 +167,30 @@ function SetRow({
         />
       </div>
 
-      <DoneButton
-        done={set.done}
-        onToggle={() => {
-          if (set.done) {
-            haptic(6);
-            uncompleteSet(exIdx, index);
-          } else {
-            onDone(index);
-          }
-        }}
-      />
+        <DoneButton
+          done={set.done}
+          onToggle={() => {
+            if (set.done) {
+              haptic(6);
+              uncompleteSet(exIdx, index);
+            } else {
+              onDone(index);
+            }
+          }}
+        />
+      </div>
+
+      <div className="mt-1.5">
+        <RirPicker
+          value={set.rir}
+          setNumber={index + 1}
+          onPick={(v) => setRir(exIdx, index, v)}
+        />
+      </div>
+
+      {set.done && set.restSec != null && (
+        <p className="tnum mt-1 pl-6 text-micro text-ink-faint">Descanso previo {clock(set.restSec)}</p>
+      )}
     </motion.div>
   );
 }
@@ -135,6 +202,7 @@ export function ExerciseCard({
   weightStep,
   prE1RM,
   onSetDone,
+  registerRow,
 }: {
   exercise: LoggedExercise;
   exIdx: number;
@@ -143,6 +211,8 @@ export function ExerciseCard({
   /** Mejor 1RM estimado histórico: sirve para marcar la serie que lo bate. */
   prE1RM: number | null;
   onSetDone: (exIdx: number, setIdx: number) => void;
+  /** Registra cada fila para poder desplazarse a la siguiente sin marcar. */
+  registerRow?: (exIdx: number, setIdx: number, el: HTMLDivElement | null) => void;
 }) {
   const [justPr, setJustPr] = useState<string | null>(null);
   const doneCount = exercise.sets.filter((s) => s.done).length;
@@ -197,7 +267,7 @@ export function ExerciseCard({
             {exercise.muscles.map((m) => MUSCLE_LABEL[m.muscle]).join(' · ')}
           </p>
           <p className="tnum mt-0.5 text-micro text-ink-faint">
-            {low}–{high} reps · {clock(exercise.targetRest)} de descanso
+            {low}–{high} repeticiones
           </p>
         </div>
 
@@ -243,6 +313,7 @@ export function ExerciseCard({
                   weightStep={weightStep}
                   isPr={justPr === set.id}
                   onDone={handleDone}
+                  rowRef={registerRow ? (el) => registerRow(exIdx, i, el) : undefined}
                 />
               ))}
             </AnimatePresence>

@@ -133,6 +133,22 @@
   .label {
     @apply text-micro font-semibold uppercase tracking-label text-ink-faint;
   }
+
+  /* Realce azul de lo que está activo: un filo de color a la izquierda en
+     vez de un fondo entero, que ensuciaría menos papel. */
+  .marked {
+    @apply relative;
+  }
+  .marked::before {
+    content: '';
+    position: absolute;
+    left: -0.75rem;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 2px;
+    border-radius: 1px;
+    background: theme('colors.accent.DEFAULT');
+  }
 }
 
 @layer utilities {

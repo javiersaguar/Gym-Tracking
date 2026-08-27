@@ -15,43 +15,98 @@ no hay servidor, ni cuenta, ni red que se pueda caer a mitad de una serie.
 - **Apuntar una serie son dos toques.** Cada serie trae ya puesto el peso de la última vez; se ajusta
   con los pulsadores (mantener pulsado acelera) o se escribe la cifra directamente. Debajo del nombre
   del ejercicio siempre está lo que hiciste la vez anterior.
-- **Cronómetro de descanso.** Arranca solo al marcar una serie y cuenta hacia arriba contra el objetivo
-  del ejercicio, que se puede ajustar sobre la marcha. Avisa con dos pitidos y vibración al llegar.
-  El tiempo se calcula desde el instante de arranque, así que no se pierde un segundo aunque bloquees
-  el móvil o Android mate la app.
+- **Dos cronómetros.** Uno mide la sesión entera desde que empiezas; el otro arranca solo al marcar una
+  serie y lo paras tú cuando vas a la siguiente. Sin objetivo que cumplir: en un gimnasio lleno el
+  descanso lo decide la cola de la prensa. El tiempo se calcula desde el instante de arranque, así que
+  no se pierde un segundo aunque bloquees el móvil o el sistema mate la app en segundo plano.
+- **RIR en cada serie.** Un toque para apuntar cuántas repeticiones te quedaban. Es lo que separa «7 y
+  podía con dos más» de «7 y me morí», y lo que permite saber si una sesión floja fue falta de fuerza
+  o falta de ganas.
 - **Análisis al cerrar el entreno.** Índice de progreso por grupo muscular, récords batidos, lectura de
   qué ha pasado y qué peso tocar la próxima vez en cada ejercicio.
-- **Progreso a lo largo del tiempo.** Qué has trabajado más, series semanales por grupo contra una
-  franja de referencia, evolución del 1RM estimado ejercicio a ejercicio y calendario de constancia.
+- **Progreso, en cuatro vistas** y con el tramo de días que elijas (7, 14, 30, 90 o un año):
+  - **Mapa** — dos siluetas con un mapa de calor por grupo muscular. El color no son los kilos: es cómo
+    de atendido está el grupo, mezclando volumen semanal, frecuencia, RIR y progreso. Se toca un
+    músculo y se ve el desglose de los cuatro componentes.
+  - **Kilos** — tonelaje total por músculo y por ejercicio, desde series × repeticiones × peso.
+  - **Fuerza** — evolución del 1RM estimado, tonelaje sesión a sesión y **tabla de récords por
+    repetición** (mejor peso a 5, a 8, a 10…) de cada ejercicio.
+  - **Descanso** — nube de puntos de descanso frente a rendimiento con la curva del modelo encima,
+    para comprobar con tus propios datos si la fórmula te describe.
+- **Registro completo.** Cada entreno desplegable serie a serie: ejercicio, peso, repeticiones, RIR y
+  el descanso que precedió a cada una. Exportable a CSV.
 
-## Cómo se mide el progreso
+## Cómo se mide el progreso cuando los descansos no son uniformes
 
-«Progresar» no es una sola cosa, así que se miden tres, y cada una usa el peso, las repeticiones y
-el descanso de forma distinta:
+Este es el problema de fondo de la app. En un gimnasio lleno el descanso lo decide la cola de la
+prensa, no tú. Si el índice premiara meter más trabajo por minuto, un día de esperas se leería como
+un bajón de forma — que es justo lo contrario de lo que pasó.
 
-| Métrica | Cómo se calcula | Qué dice |
+### Las tres piezas
+
+**1. Curva de recuperación.** Con el mismo peso, las repeticiones que puedes hacer dependen de cuánto
+llevas parado, y esa curva se satura:
+
+```
+recuperación(t) = 0,5 + 0,5 · (1 − e^(−t/110s))
+```
+
+≈71 % con 1 min, ≈83 % con 2 min, ≈90 % con 3 min, ≈97 % con 5 min. Son valores coherentes con lo
+publicado sobre intervalos de descanso. Es una media poblacional, no una medida tuya: sirve para
+descontar el efecto del descanso, no para predecir tu serie exacta. La pestaña **Descanso** dibuja tus
+series reales contra esta curva para que puedas comprobarlo en vez de creértelo.
+
+**2. Amortiguación por RIR.** La pieza que hace que todo funcione. Las series de esta rutina son
+prescritas: paras a las 8 porque pone 8, no porque no puedas más. Si te sobraban tres repeticiones, el
+descanso no decidió nada y no hay nada que descontar; solo cuando acabas cerca del fallo el descanso
+explica el resultado. Sin RIR apuntado se aplica un valor intermedio.
+
+**3. Atribución.** Al comparar con la referencia, el cambio se parte en dos:
+
+```
+total = efecto del descanso × cambio real
+```
+
+Y la app lo dice con esas palabras: *«Has subido un 8 %. De eso, 3 puntos son porque descansaste 40 s
+más de media; los otros 5 son cambio real.»* También cuando el volumen sale plano pero el descanso no,
+que es el caso que más despista.
+
+### El índice
+
+Dos componentes, y la densidad **fuera**:
+
+| Peso | Componente | Qué es |
 |---|---|---|
-| **Tonelaje** | Σ peso × repeticiones | El trabajo mecánico total |
-| **Intensidad** | Mejor 1RM estimado por [Epley](https://en.wikipedia.org/wiki/One-repetition_maximum): `peso × (1 + reps/30)` | La fuerza pura |
-| **Densidad** | Tonelaje ÷ tiempo total, contando el descanso real medido | Cuánto trabajo metes por minuto |
+| 0,55 | **Fuerza** | Mejor 1RM estimado por [Epley](https://en.wikipedia.org/wiki/One-repetition_maximum) contando el RIR: `peso × (1 + (reps + RIR)/30)` |
+| 0,45 | **Volumen ajustado** | Σ peso × repeticiones, dividido por el efecto del descanso |
+
+La fuerza **no se normaliza** por el descanso a propósito. Normalizarla parecía elegante y estaba mal:
+convertía «he hecho lo mismo descansando más» en una caída de fuerza del 20 %, con lo que el índice
+seguía bailando al ritmo de la cola de la prensa, solo que al revés. Lo que levantas es lo que
+levantas; el efecto del descanso vive en el volumen, que es donde de verdad manda.
+
+La **densidad** (kg por minuto) se sigue calculando y se enseña, pero fuera del índice: es una medida
+de cómo estaba el gimnasio, no de cómo estás tú.
+
+Todo se compara contra la **mediana de tus tres últimas sesiones de ese grupo** — mediana y no media,
+para que una sesión mala no hunda el listón de las tres siguientes. **100 = igual que tu media
+reciente.** El índice de la sesión entera es la media de los grupos ponderada por tonelaje, para que un
+gemelo no valga lo mismo que una prensa.
 
 Cada serie reparte su estímulo entre los músculos que trabaja, no entero a todos: una prensa cuenta
 0,65 de cuádriceps, 0,25 de glúteo y 0,1 de femoral. De ahí salen las **series efectivas** por grupo.
 
-El **índice de progreso** compara los tres números contra la **mediana de tus tres últimas sesiones de
-ese grupo** (mediana y no media: una sesión mala no debe hundir el listón de las tres siguientes):
+### El mapa de calor
 
-```
-índice = 100 × (0,45 · tonelaje/base + 0,35 · intensidad/base + 0,20 · densidad/base)
-```
+El color de cada músculo es una puntuación compuesta de cuatro cosas, todas visibles por separado al
+tocarlo para que el número no haya que creérselo a ciegas:
 
-**100 = igual que tu media reciente.** El tonelaje pesa más porque es lo que más se mueve de sesión a
-sesión; la densidad pesa poco porque un día con más cola en las máquinas no significa que hayas
-entrenado peor. Si falta un componente (un grupo que solo entró como secundario no tiene dato de
-fuerza), su peso se reparte entre los demás en vez de contarse como cero.
-
-El índice de la sesión entera es la media de los grupos ponderada por tonelaje, para que un gemelo no
-valga lo mismo que una prensa.
+| Componente | Referencia |
+|---|---|
+| **Volumen** | series efectivas por semana frente a la franja recomendada del grupo |
+| **Frecuencia** | días por semana que se toca (dos es el ideal) |
+| **Intensidad** | RIR medio: acercarse al fallo sin pasarse de largo |
+| **Progreso** | índice de las sesiones del periodo |
 
 ## Instalar en el móvil
 
@@ -86,13 +141,16 @@ src/
   lib/
     types.ts       Modelo de datos
     routine.ts     Catálogo de ejercicios y el ciclo de 10 días sembrado
-    metrics.ts     El algoritmo: tonelaje, 1RM, densidad, índice, récords, reparto
+    metrics.ts     El algoritmo: curva de recuperación, capacidad, índice, atribución
     analysis.ts    El análisis en prosa del final del entreno
     storage.ts     Persistencia en localStorage
     timer.ts       Cronómetro de descanso (fuera de React, sobrevive a recargas)
     actions.ts     Ciclo de vida de la sesión y edición de la rutina
   components/      Primitivas de interfaz, campos numéricos, gráficos
-  screens/         Portada · Hoy · Entreno · Resumen · Progreso · Historial · Rutina · Ajustes
+  lib/
+    muscleState.ts Puntuación compuesta por grupo, la que colorea el mapa
+    csv.ts         Exportación e importación del registro, fila por serie
+  screens/         Portada · Hoy · Entreno · Resumen · Progreso · Registro · Historial · Rutina · Ajustes
 scripts/
   build-sw.mjs     Genera el service worker con la lista exacta del build
   make-icons.mjs   Rasteriza los iconos PNG desde el SVG

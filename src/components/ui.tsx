@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { haptic } from '../lib/hooks';
@@ -419,6 +419,71 @@ export function Toast({ message, onDone }: { message: string | null; onDone: () 
             {message}
           </div>
         </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+
+/* ── Panel que se abre desde su origen ───────────────────────────────────── */
+
+/**
+ * Expansión al estilo de la carpeta de aplicaciones de iOS: el panel no
+ * aparece de la nada en el centro, crece desde el sitio exacto que se ha
+ * tocado y vuelve a él al cerrarse.
+ *
+ * El truco es el `transform-origin`: se calcula desde la posición del
+ * disparador en pantalla, así la relación entre lo que tocas y lo que se abre
+ * queda explícita. Entra desde `scale(0.94)`, nunca desde cero — nada en el
+ * mundo real aparece de la nada.
+ */
+export function OriginPanel({
+  open,
+  origin,
+  onClose,
+  children,
+  label,
+}: {
+  open: boolean;
+  /** Centro del disparador en coordenadas de ventana. */
+  origin: { x: number; y: number } | null;
+  onClose: () => void;
+  children: ReactNode;
+  label?: string;
+}) {
+  const reduce = useReducedMotion();
+
+  const transformOrigin = origin
+    ? `${(origin.x / window.innerWidth) * 100}% ${(origin.y / window.innerHeight) * 100}%`
+    : 'center';
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-5">
+          <motion.button
+            aria-label="Cerrar"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-canvas/70 backdrop-blur-[3px]"
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={label}
+            style={{ transformOrigin }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, transform: 'scale(0.94)' }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, transform: 'scale(1)' }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, transform: 'scale(0.94)' }}
+            transition={{ type: 'spring', bounce: 0.16, duration: 0.42 }}
+            className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-paper shadow-float"
+          >
+            {children}
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

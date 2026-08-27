@@ -29,7 +29,6 @@ function snapshot(ex: Exercise, prefill: number[] = []): LoggedExercise {
     name: ex.name,
     muscles: ex.muscles.map((m) => ({ ...m })),
     loadKind: ex.loadKind,
-    targetRest: ex.targetRest,
     repRange: [...ex.repRange] as [number, number],
     sets: Array.from({ length: ex.plannedSets }, (_, i) => ({ ...emptySet(), weight: prefill[i] ?? carry })),
     skipped: false,
@@ -137,16 +136,23 @@ export function patchSet(exIdx: number, setIdx: number, patch: Partial<LoggedSet
  * Marca una serie como hecha. `restSec` es el descanso real medido por el
  * cronómetro desde la serie anterior; se guarda en la serie que acaba de
  * terminar porque es el descanso *previo* a ella.
+ *
+ * También se guarda en la primera serie de un ejercicio: ese es el descanso
+ * de esperar a que se libere la máquina, y es justo el que más varía y el que
+ * más falta hace para descontar su efecto del rendimiento.
  */
 export function completeSet(exIdx: number, setIdx: number, restSec: number | null): void {
   withActive((a) =>
     mapExercise(a, exIdx, (e) => ({
       ...e,
-      sets: e.sets.map((s, i) =>
-        i === setIdx ? { ...s, done: true, at: Date.now(), restSec: setIdx === 0 ? null : restSec } : s,
-      ),
+      sets: e.sets.map((s, i) => (i === setIdx ? { ...s, done: true, at: Date.now(), restSec } : s)),
     })),
   );
+}
+
+/** Repeticiones que quedaban en la recámara. */
+export function setRir(exIdx: number, setIdx: number, rir: number | null): void {
+  patchSet(exIdx, setIdx, { rir });
 }
 
 export function uncompleteSet(exIdx: number, setIdx: number): void {
@@ -205,16 +211,6 @@ export function setPlannedSets(dayId: string, exIdx: number, sets: number): void
   );
 }
 
-export function setTargetRest(dayId: string, exIdx: number, rest: number): void {
-  const n = Math.max(15, Math.min(600, Math.round(rest / 15) * 15));
-  update((s) =>
-    mapDay(s, dayId, (d) => ({
-      ...d,
-      exercises: d.exercises.map((e, i) => (i === exIdx ? { ...e, targetRest: n } : e)),
-    })),
-  );
-}
-
 export function removeExerciseFromDay(dayId: string, exIdx: number): void {
   update((s) => mapDay(s, dayId, (d) => ({ ...d, exercises: d.exercises.filter((_, i) => i !== exIdx) })));
 }
@@ -245,6 +241,19 @@ export function toggleRestDay(dayId: string): void {
 
 export function updateSettings(patch: Partial<Settings>): void {
   update((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+}
+
+/** Añade sesiones importadas sin pisar las que ya existen con el mismo id. */
+export function addSessions(incoming: Session[]): number {
+  let added = 0;
+  update((s) => {
+    const known = new Set(s.sessions.map((x) => x.id));
+    const fresh = incoming.filter((x) => !known.has(x.id));
+    added = fresh.length;
+    if (!added) return s;
+    return { ...s, sessions: [...fresh, ...s.sessions].sort((a, b) => b.start - a.start) };
+  });
+  return added;
 }
 
 /** Nombre legible de un ejercicio del catálogo, para los selectores. */

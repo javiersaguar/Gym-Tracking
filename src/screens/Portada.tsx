@@ -47,10 +47,15 @@ export function Portada({
 
   const destinos = [
     { to: '/hoy', title: 'Hoy', body: 'El ciclo completo, la semana y la constancia' },
-    { to: '/progreso', title: 'Progreso', body: 'Volumen por grupo y fuerza por ejercicio' },
+    { to: '/progreso', title: 'Progreso', body: 'Mapa muscular, kilos por grupo y fuerza' },
+    {
+      to: '/registro',
+      title: 'Registro',
+      body: total.count ? 'Cada serie con su peso, RIR y descanso' : 'Cada serie, cuando empieces a apuntar',
+    },
     {
       to: '/historial',
-      title: 'Historial',
+      title: 'Análisis',
       body: total.count
         ? `${plural(total.count, 'entreno')} · ${tonnage(total.tonnage)} movidos`
         : 'Todavía sin entrenos guardados',
@@ -130,8 +135,12 @@ export function Portada({
               className="group flex w-full items-center gap-4 border-b border-line py-4 text-left transition-colors duration-panel hover:bg-paper"
             >
               <span className="min-w-0 flex-1">
-                <span className="block text-body-lg font-medium text-ink">{d.title}</span>
-                <span className="mt-0.5 block truncate text-caption text-ink-faint">{d.body}</span>
+                <span className="block text-body-lg font-medium text-ink transition-colors duration-panel group-hover:text-accent">
+                  {d.title}
+                </span>
+                <span className="mt-0.5 block truncate text-caption text-ink-faint transition-colors duration-panel group-hover:text-ink-muted">
+                {d.body}
+              </span>
               </span>
               <Arrow className="text-ink-faint transition-transform duration-panel ease-out group-hover:translate-x-0.5 group-hover:text-ink" />
             </button>

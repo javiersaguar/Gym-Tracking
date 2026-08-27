@@ -2,13 +2,13 @@ import { defaultRoutine, seedReferences } from './routine';
 import type { Session, Settings, Store } from './types';
 
 const KEY = 'gym-tracking:v1';
-const VERSION = 1;
+const VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
-  defaultRest: 120,
-  restAlert: true,
   weightStep: 2.5,
   keepAwake: true,
+  backupEvery: 8,
+  lastBackupCount: 0,
 };
 
 function emptyStore(): Store {
@@ -34,15 +34,7 @@ function read(): Store {
     const raw = localStorage.getItem(KEY);
     if (!raw) return emptyStore();
     const parsed = JSON.parse(raw) as Partial<Store>;
-    const base = emptyStore();
-    return {
-      version: VERSION,
-      routine: parsed.routine ?? base.routine,
-      sessions: parsed.sessions ?? [],
-      active: parsed.active ?? null,
-      seedRefs: parsed.seedRefs ?? base.seedRefs,
-      settings: { ...base.settings, ...(parsed.settings ?? {}) },
-    };
+    return migrate(parsed);
   } catch {
     /* Un JSON corrupto no puede dejar la app en blanco para siempre: se
        guarda a un lado por si se puede rescatar a mano y se sigue. */
@@ -54,6 +46,48 @@ function read(): Store {
     }
     return emptyStore();
   }
+}
+
+/**
+ * Sube los datos guardados a la versión actual del modelo.
+ *
+ * La v2 quitó el descanso objetivo por ejercicio —el gimnasio decide el
+ * descanso, no un ajuste— y añadió el RIR por serie. Nada de esto invalida un
+ * histórico anterior: los campos que sobran se ignoran y los que faltan
+ * entran a null, que el algoritmo ya sabe tratar como «sin dato».
+ */
+function migrate(parsed: Partial<Store>): Store {
+  const base = emptyStore();
+  const fixSession = (s: Session): Session => ({
+    ...s,
+    exercises: (s.exercises ?? []).map((ex) => {
+      const { targetRest: _drop, ...rest } = ex as typeof ex & { targetRest?: number };
+      return {
+        ...rest,
+        sets: (ex.sets ?? []).map((set) => ({ ...set, rir: set.rir ?? null })),
+      };
+    }),
+  });
+
+  const routine = parsed.routine ?? base.routine;
+
+  return {
+    version: VERSION,
+    routine: {
+      ...routine,
+      days: (routine.days ?? []).map((d) => ({
+        ...d,
+        exercises: (d.exercises ?? []).map((ex) => {
+          const { targetRest: _drop, ...rest } = ex as typeof ex & { targetRest?: number };
+          return rest;
+        }),
+      })),
+    },
+    sessions: (parsed.sessions ?? []).map(fixSession),
+    active: parsed.active ? fixSession(parsed.active) : null,
+    seedRefs: parsed.seedRefs ?? base.seedRefs,
+    settings: { ...base.settings, ...(parsed.settings ?? {}) },
+  };
 }
 
 let state: Store = read();
@@ -127,15 +161,7 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.sessions) || !parsed.routine) {
     return { ok: false, error: 'El archivo no parece una copia de Gym Tracking.' };
   }
-  const base = emptyStore();
-  update(() => ({
-    version: VERSION,
-    routine: parsed.routine ?? base.routine,
-    sessions: (parsed.sessions ?? []) as Session[],
-    active: parsed.active ?? null,
-    seedRefs: parsed.seedRefs ?? base.seedRefs,
-    settings: { ...base.settings, ...(parsed.settings ?? {}) },
-  }));
+  update(() => migrate(parsed));
   return { ok: true };
 }
 
@@ -146,4 +172,55 @@ export function resetAll(): void {
 
 export function resetRoutine(): void {
   update((s) => ({ ...s, routine: defaultRoutine() }));
+}
+
+
+/* ── Almacenamiento duradero ─────────────────────────────────────────────── */
+
+/**
+ * Pide al navegador que no borre estos datos para hacer sitio.
+ *
+ * Sin esto, el almacenamiento de un sitio web es «best effort»: si el móvil
+ * anda justo de espacio, puede desaparecer un año de entrenos sin avisar. Con
+ * la app instalada en la pantalla de inicio, los navegadores suelen conceder
+ * el permiso sin preguntar nada.
+ */
+export async function requestPersistence(): Promise<boolean> {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted?.()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
+export async function storageInfo(): Promise<{ persisted: boolean; usedKB: number | null }> {
+  let persisted = false;
+  let usedKB: number | null = null;
+  try {
+    persisted = (await navigator.storage?.persisted?.()) ?? false;
+    const est = await navigator.storage?.estimate?.();
+    if (est?.usage != null) usedKB = Math.round(est.usage / 1024);
+  } catch {
+    /* el navegador no expone el dato */
+  }
+  if (usedKB == null) {
+    try {
+      usedKB = Math.round(new Blob([localStorage.getItem(KEY) ?? '']).size / 1024);
+    } catch {
+      usedKB = null;
+    }
+  }
+  return { persisted, usedKB };
+}
+
+/** Cuántas sesiones se han guardado desde la última copia descargada. */
+export function sessionsSinceBackup(s: Store = state): number {
+  return Math.max(0, s.sessions.length - s.settings.lastBackupCount);
+}
+
+export function markBackedUp(): void {
+  update((s) => ({ ...s, settings: { ...s.settings, lastBackupCount: s.sessions.length } }));
+  flushNow();
 }

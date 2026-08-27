@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  attribution,
   balance,
   e1RM,
+  e1RMCapacity,
   exerciseStats,
+  expectedPerformance,
+  fatigueLimited,
   muscleProgress,
   muscleStats,
   personalBests,
   prsInSession,
+  recovery,
+  repMaxTable,
+  restVsPerformance,
   sessionIndex,
   sessionStats,
   trendPct,
@@ -15,9 +22,9 @@ import {
 import type { LoggedExercise, LoggedSet, Session } from './types';
 
 let counter = 0;
-function set(weight: number, reps: number, restSec: number | null = 120): LoggedSet {
+function set(weight: number, reps: number, restSec: number | null = 120, rir: number | null = null): LoggedSet {
   counter += 1;
-  return { id: `s${counter}`, weight, reps, restSec, at: 0, done: true, rir: null };
+  return { id: `s${counter}`, weight, reps, restSec, at: 0, done: true, rir };
 }
 
 function exercise(
@@ -30,7 +37,6 @@ function exercise(
     name: exerciseId,
     muscles: muscles.map(([muscle, share]) => ({ muscle, share })) as LoggedExercise['muscles'],
     loadKind: 'peso',
-    targetRest: 120,
     repRange: [6, 10],
     sets,
     skipped: false,
@@ -109,7 +115,7 @@ describe('muscleStats', () => {
     expect(m.get('triceps')?.tonnage).toBeCloseTo(720 * 0.3, 5);
   });
 
-  it('solo toma intensidad de los ejercicios donde el grupo es el principal', () => {
+  it('solo toma fuerza de los ejercicios donde el grupo es el principal', () => {
     const s = session('a', T0, [
       exercise('press', [set(100, 5)], [
         ['pecho', 0.7],
@@ -117,8 +123,8 @@ describe('muscleStats', () => {
       ]),
     ]);
     const m = muscleStats(s);
-    expect(m.get('pecho')?.intensity).toBeGreaterThan(0);
-    expect(m.get('triceps')?.intensity).toBe(0);
+    expect(m.get('pecho')?.capacity).toBeGreaterThan(0);
+    expect(m.get('triceps')?.capacity).toBe(0);
   });
 
   it('no cuenta los ejercicios saltados', () => {
@@ -164,7 +170,7 @@ describe('muscleProgress', () => {
     const hoy = session('hoy', T0, [exercise('remo', [set(45, 8), set(45, 8)])], 1800);
     const [espalda] = muscleProgress(hoy, history);
     expect(espalda?.index).toBeGreaterThan(100);
-    expect(espalda?.parts.tonnage).toBeCloseTo(45 / 40, 5);
+    expect(espalda?.parts.volume).toBeCloseTo(45 / 40, 5);
   });
 
   it('baja por debajo de 100 al perder repeticiones', () => {
@@ -219,7 +225,8 @@ describe('muscleProgress', () => {
     const progress = muscleProgress(session('hoy', T0, [remo(40)], 1800), history);
     const biceps = progress.find((p) => p.muscle === 'biceps');
     expect(biceps).toBeDefined();
-    expect(biceps?.parts.intensity).toBeNull();
+    /* Como secundario no tiene dato de capacidad, pero el volumen sí. */
+    expect(biceps?.parts.capacity).toBeNull();
     expect(biceps?.index).toBe(100);
   });
 });
@@ -320,5 +327,169 @@ describe('trendPct', () => {
   it('detecta la caída', () => {
     const pts = [20, 18, 19, 16, 15].map((value, at) => ({ at, value }));
     expect(trendPct(pts) as number).toBeLessThan(0);
+  });
+});
+
+
+/* ── Lo nuevo: descansos no uniformes ────────────────────────────────────── */
+
+describe('curva de recuperación', () => {
+  it('crece con el descanso y se satura', () => {
+    expect(recovery(0)).toBeCloseTo(0.5, 5);
+    expect(recovery(60)).toBeGreaterThan(recovery(30));
+    expect(recovery(300)).toBeGreaterThan(0.95);
+    expect(recovery(600)).toBeLessThanOrEqual(1);
+  });
+
+  it('da valores coherentes con los intervalos habituales', () => {
+    expect(recovery(60)).toBeCloseTo(0.71, 1);
+    expect(recovery(120)).toBeCloseTo(0.83, 1);
+    expect(recovery(180)).toBeCloseTo(0.9, 1);
+  });
+
+  it('trata la primera serie de un ejercicio como fresca', () => {
+    /* Su descanso previo es el de cambiar de máquina: no es comparable con
+       el de entre series y no debe penalizar. */
+    expect(expectedPerformance(0, 15)).toBe(1);
+    expect(expectedPerformance(0, 600)).toBe(1);
+  });
+
+  it('espera menos de las series posteriores con poco descanso', () => {
+    expect(expectedPerformance(1, 45)).toBeLessThan(expectedPerformance(1, 180));
+  });
+
+  it('acumula fatiga aunque el descanso sea el mismo', () => {
+    expect(expectedPerformance(3, 120)).toBeLessThan(expectedPerformance(1, 120));
+  });
+});
+
+describe('capacidad con RIR', () => {
+  it('cuenta las repeticiones que quedaban en la recámara', () => {
+    expect(e1RMCapacity(40, 7, 3)).toBeCloseTo(e1RM(40, 10), 5);
+  });
+
+  it('sin RIR se queda en lo demostrado, que es lo conservador', () => {
+    expect(e1RMCapacity(40, 7, null)).toBeCloseTo(e1RM(40, 7), 5);
+  });
+
+  it('la misma serie vale más si sobraban repeticiones', () => {
+    const alFallo = exerciseStats(exercise('x', [set(40, 8, 120, 0)]));
+    const sobrado = exerciseStats(exercise('x', [set(40, 8, 120, 3)]));
+    expect(sobrado.capacity).toBeGreaterThan(alFallo.capacity);
+  });
+
+  it('la fuerza no se mueve con el descanso: eso vive en el volumen', () => {
+    /* Normalizar aquí convertía «lo mismo descansando más» en una caída de
+       fuerza del 20 %, y el índice volvía a bailar con la cola del gimnasio.
+       Lo que levantas es lo que levantas. */
+    const corto = exerciseStats(exercise('x', [set(40, 8), set(40, 8, 45)]));
+    const largo = exerciseStats(exercise('x', [set(40, 8), set(40, 8, 240)]));
+    expect(corto.capacity).toBeCloseTo(largo.capacity, 5);
+  });
+
+  it('el descuento del descanso se apaga si sobraban repeticiones', () => {
+    /* Paras a las 8 porque pone 8: el descanso no decidió nada. */
+    expect(fatigueLimited(0)).toBe(1);
+    expect(fatigueLimited(1)).toBe(1);
+    expect(fatigueLimited(4)).toBe(0);
+    expect(fatigueLimited(6)).toBe(0);
+    expect(fatigueLimited(null)).toBeGreaterThan(0);
+    expect(fatigueLimited(null)).toBeLessThan(1);
+  });
+});
+
+describe('atribución descanso / mejora real', () => {
+  const dos = (w: number, rest: number) => exercise('remo', [set(w, 8), set(w, 8, rest)]);
+
+  it('no penaliza haber esperado por la máquina', () => {
+    /* Mismo peso y mismas repeticiones, pero hoy con el doble de descanso:
+       el volumen es idéntico, así que no hay mérito ni castigo. */
+    const history = [session('h1', T0 - DAY, [dos(40, 90)], 1800)];
+    const hoy = session('hoy', T0, [dos(40, 240)], 1800);
+    const a = attribution(hoy, history);
+    expect(a).not.toBeNull();
+    expect((a as NonNullable<typeof a>).totalPct).toBeCloseTo(0, 1);
+    /* Con más descanso cabía esperar MÁS trabajo; como no lo hubo, el
+       componente real sale negativo y el del descanso positivo. */
+    expect((a as NonNullable<typeof a>).restPct).toBeGreaterThan(0);
+    expect((a as NonNullable<typeof a>).realPct).toBeLessThan(0);
+  });
+
+  it('con el mismo descanso, todo el cambio es real', () => {
+    const history = [session('h1', T0 - DAY, [dos(40, 120)], 1800)];
+    const hoy = session('hoy', T0, [dos(50, 120)], 1800);
+    const a = attribution(hoy, history) as NonNullable<ReturnType<typeof attribution>>;
+    expect(a.restPct).toBeCloseTo(0, 5);
+    expect(a.realPct).toBeCloseTo(a.totalPct, 5);
+    expect(a.restShare).toBeCloseTo(0, 5);
+  });
+
+  it('mide la diferencia de descanso medio frente a la referencia', () => {
+    /* `dos` deja los descansos en [120, x], así que la media se mueve la
+       mitad de lo que se mueve el segundo descanso. */
+    const history = [session('h1', T0 - DAY, [dos(40, 60)], 1800)];
+    const hoy = session('hoy', T0, [dos(40, 180)], 1800);
+    const a = attribution(hoy, history) as NonNullable<ReturnType<typeof attribution>>;
+    expect(a.restDeltaSec).toBeCloseTo(60, 0);
+  });
+
+  it('la primera vez no hay nada que atribuir', () => {
+    expect(attribution(session('hoy', T0, [dos(40, 120)]), [])).toBeNull();
+  });
+});
+
+describe('el índice ya no castiga el descanso', () => {
+  const dos = (w: number, rest: number) => exercise('remo', [set(w, 8), set(w, 8, rest)]);
+
+  it('repetir la misma sesión con descansos muy distintos no hunde el índice', () => {
+    const history = [
+      session('h1', T0 - DAY, [dos(40, 90)], 1800),
+      session('h2', T0 - 2 * DAY, [dos(40, 90)], 1800),
+    ];
+    /* Mismo trabajo, pero la sesión duró mucho más por las esperas. Con el
+       índice viejo la densidad se desplomaba y el índice con ella. */
+    const hoy = session('hoy', T0, [dos(40, 300)], 4200);
+    const [espalda] = muscleProgress(hoy, history);
+    expect(espalda?.index).toBeGreaterThan(85);
+  });
+
+  it('subir peso puntúa aunque el gimnasio esté lleno', () => {
+    const history = [session('h1', T0 - DAY, [dos(40, 90)], 1800)];
+    const hoy = session('hoy', T0, [dos(45, 300)], 4200);
+    const [espalda] = muscleProgress(hoy, history);
+    expect(espalda?.index).toBeGreaterThan(100);
+  });
+});
+
+describe('tabla de récords por repetición', () => {
+  const sessions = [
+    session('a', T0 - DAY, [exercise('remo', [set(40, 8), set(45, 5)])]),
+    session('b', T0, [exercise('remo', [set(42.5, 8), set(40, 12)])]),
+  ];
+
+  it('guarda el mejor peso de cada número de repeticiones', () => {
+    const t = repMaxTable(sessions, 'remo');
+    expect(t.find((r) => r.reps === 8)?.weight).toBe(42.5);
+    expect(t.find((r) => r.reps === 5)?.weight).toBe(45);
+    expect(t.find((r) => r.reps === 12)?.weight).toBe(40);
+  });
+
+  it('sale ordenada por repeticiones', () => {
+    expect(repMaxTable(sessions, 'remo').map((r) => r.reps)).toEqual([5, 8, 12]);
+  });
+});
+
+describe('descanso frente a rendimiento', () => {
+  it('solo compara series a la misma carga', () => {
+    const s = session('a', T0, [exercise('remo', [set(40, 10), set(40, 8, 60), set(30, 12, 60)])]);
+    const pts = restVsPerformance([s], 'remo');
+    expect(pts).toHaveLength(1);
+    expect(pts[0]?.ratio).toBeCloseTo(0.8, 5);
+    expect(pts[0]?.rest).toBe(60);
+  });
+
+  it('nunca incluye la primera serie, que no tiene con qué compararse', () => {
+    const s = session('a', T0, [exercise('remo', [set(40, 10, 300)])]);
+    expect(restVsPerformance([s], 'remo')).toHaveLength(0);
   });
 });

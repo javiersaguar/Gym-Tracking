@@ -12,7 +12,6 @@ import type { Day, Exercise, Muscle, MuscleShare, Routine } from './types';
 type Spec = {
   name: string;
   muscles: [Muscle, number][];
-  rest: number;
   reps: [number, number];
   load?: 'peso' | 'corporal';
   notes?: string;
@@ -22,148 +21,124 @@ const CATALOG = {
   'remo-t': {
     name: 'Remo en T',
     muscles: [['espalda', 0.8], ['biceps', 0.2]],
-    rest: 150,
     reps: [6, 10],
   },
   'remo-t-densidad': {
     name: 'Remo en T · densidad',
     muscles: [['espalda', 0.8], ['biceps', 0.2]],
-    rest: 60,
     reps: [8, 12],
-    notes: 'Descanso corto a propósito: aquí se busca densidad, no un máximo.',
+    notes: 'Día de densidad: series seguidas, sin alargar el descanso.',
   },
   'jalon-cerrado': {
     name: 'Jalón cerrado',
     muscles: [['espalda', 0.8], ['biceps', 0.2]],
-    rest: 120,
     reps: [6, 10],
   },
   'jalon-pecho': {
     name: 'Jalón al pecho',
     muscles: [['espalda', 0.8], ['biceps', 0.2]],
-    rest: 120,
     reps: [6, 10],
   },
   'gironda-uni': {
     name: 'Gironda unilateral',
     muscles: [['espalda', 0.85], ['biceps', 0.15]],
-    rest: 90,
     reps: [7, 11],
     notes: 'El peso es por lado.',
   },
   'pull-over': {
     name: 'Pull over',
     muscles: [['espalda', 0.85], ['triceps', 0.15]],
-    rest: 90,
     reps: [8, 12],
   },
   'hombro-posterior': {
     name: 'Hombro posterior',
     muscles: [['hombro', 0.8], ['espalda', 0.2]],
-    rest: 75,
     reps: [10, 15],
   },
   'predicador-maquina': {
     name: 'Bíceps predicador en máquina',
     muscles: [['biceps', 1]],
-    rest: 90,
     reps: [6, 10],
   },
   'curl-bayesian': {
     name: 'Curl bayesiano',
     muscles: [['biceps', 1]],
-    rest: 75,
     reps: [8, 12],
   },
   'press-inclinado': {
     name: 'Press inclinado',
     muscles: [['pecho', 0.7], ['hombro', 0.15], ['triceps', 0.15]],
-    rest: 180,
     reps: [5, 8],
   },
   'press-inclinado-maquina': {
     name: 'Press inclinado en máquina',
     muscles: [['pecho', 0.7], ['hombro', 0.15], ['triceps', 0.15]],
-    rest: 120,
     reps: [6, 10],
   },
   'press-plano-maquina': {
     name: 'Press plano en máquina',
     muscles: [['pecho', 0.7], ['triceps', 0.2], ['hombro', 0.1]],
-    rest: 120,
     reps: [6, 10],
   },
   'press-plano-smith': {
     name: 'Press plano en multipower',
     muscles: [['pecho', 0.7], ['triceps', 0.2], ['hombro', 0.1]],
-    rest: 180,
     reps: [5, 8],
   },
   'laterales-polea': {
     name: 'Elevaciones laterales en polea',
     muscles: [['hombro', 1]],
-    rest: 75,
     reps: [10, 15],
     notes: 'El peso es por lado.',
   },
   'cruces-polea-inclinado': {
     name: 'Cruces de poleas inclinado',
     muscles: [['pecho', 0.9], ['hombro', 0.1]],
-    rest: 90,
     reps: [10, 14],
   },
   contractora: {
     name: 'Contractora de pecho',
     muscles: [['pecho', 1]],
-    rest: 90,
     reps: [10, 14],
   },
   'extension-triceps': {
     name: 'Extensión de tríceps',
     muscles: [['triceps', 1]],
-    rest: 75,
     reps: [8, 12],
   },
   aductor: {
     name: 'Aductor',
     muscles: [['aductor', 1]],
-    rest: 75,
     reps: [10, 15],
   },
   'gemelo-pie': {
     name: 'Gemelo de pie',
     muscles: [['gemelo', 1]],
-    rest: 60,
     reps: [10, 15],
   },
   'rumano-maquina': {
     name: 'Peso muerto rumano en máquina',
     muscles: [['femoral', 0.55], ['gluteo', 0.45]],
-    rest: 150,
     reps: [6, 10],
   },
   prensa: {
     name: 'Prensa',
     muscles: [['cuadriceps', 0.65], ['gluteo', 0.25], ['femoral', 0.1]],
-    rest: 180,
     reps: [6, 10],
   },
   'femoral-sentado': {
     name: 'Femoral sentado',
     muscles: [['femoral', 1]],
-    rest: 90,
     reps: [8, 12],
   },
   'extension-cuadriceps': {
     name: 'Extensión de cuádriceps',
     muscles: [['cuadriceps', 1]],
-    rest: 90,
     reps: [8, 12],
   },
   'abs-maquina': {
     name: 'Abdominales en máquina',
     muscles: [['abdomen', 1]],
-    rest: 60,
     reps: [10, 15],
   },
 } satisfies Record<string, Spec>;
@@ -177,7 +152,7 @@ export function catalogName(id: string): string {
 }
 
 /** Construye un ejercicio de la rutina a partir del catálogo. */
-export function makeExercise(id: CatalogId | string, plannedSets: number, restOverride?: number): Exercise {
+export function makeExercise(id: CatalogId | string, plannedSets: number): Exercise {
   const spec = (CATALOG as Record<string, Spec>)[id];
   if (!spec) throw new Error(`Ejercicio desconocido: ${id}`);
   return {
@@ -186,7 +161,6 @@ export function makeExercise(id: CatalogId | string, plannedSets: number, restOv
     muscles: spec.muscles.map(([muscle, share]) => ({ muscle, share })) as MuscleShare[],
     loadKind: spec.load ?? 'peso',
     plannedSets,
-    targetRest: restOverride ?? spec.rest,
     repRange: spec.reps,
     ...(spec.notes ? { notes: spec.notes } : {}),
   };

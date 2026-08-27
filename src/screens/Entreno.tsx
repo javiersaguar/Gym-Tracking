@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ExerciseCard } from '../components/ExerciseCard';
-import { RestTimer } from '../components/RestTimer';
+import { RestTimer, SessionClock } from '../components/RestTimer';
 import { Button, Card, Scale, Sheet } from '../components/ui';
 import { addExerciseToSession, completeSet, discardSession, finishSession } from '../lib/actions';
 import { clock, duration, plural } from '../lib/format';
@@ -32,7 +32,7 @@ export function Entreno({
   onFinished: (sessionId: string) => void;
   onExit: () => void;
 }) {
-  const timer = useRestTimer(store.settings.restAlert);
+  const timer = useRestTimer();
   const [adding, setAdding] = useState(false);
   const [closing, setClosing] = useState(false);
   const [feel, setFeel] = useState<number | null>(null);
@@ -58,27 +58,44 @@ export function Entreno({
   /* Qué toca después: la primera serie sin marcar. Es lo que se enseña en el
      cronómetro para no perder el hilo mientras descansas. */
   const nextUp = useMemo(() => {
-    for (const ex of active.exercises) {
+    for (const [exIdx, ex] of active.exercises.entries()) {
       if (ex.skipped) continue;
       const idx = ex.sets.findIndex((s) => !s.done);
-      if (idx >= 0) return { name: ex.name, setNumber: idx + 1, targetRest: ex.targetRest };
+      if (idx >= 0) return { name: ex.name, setNumber: idx + 1, exIdx, setIdx: idx };
     }
     return null;
   }, [active]);
+
+  /* Cada fila de serie se registra aquí para poder llevar la siguiente a la
+     vista sin que haya que buscarla con el pulgar. */
+  const rows = useRef(new Map<string, HTMLDivElement>());
+  const registerRow = useCallback((exIdx: number, setIdx: number, el: HTMLDivElement | null) => {
+    const key = `${exIdx}:${setIdx}`;
+    if (el) rows.current.set(key, el);
+    else rows.current.delete(key);
+  }, []);
 
   const handleSetDone = (exIdx: number, setIdx: number) => {
     const ex = active.exercises[exIdx];
     if (!ex) return;
     /* El descanso real que precede a esta serie: el que sigue corriendo, o
        el que se paró a mano con «Listo» hace un momento y todavía no se ha
-       asignado a ninguna serie. */
+       asignado a ninguna serie. Se guarda también en la primera serie de un
+       ejercicio: ahí es donde se apunta la espera por la máquina. */
     const rest = timer.running ? Math.round(timer.stop()) : timer.takePending();
     completeSet(exIdx, setIdx, rest);
 
     const isLastSet = setIdx === ex.sets.length - 1;
     const isLastExercise = exIdx === active.exercises.length - 1;
     /* Tras la última serie del entreno no hay nada que descansar. */
-    if (!(isLastSet && isLastExercise)) timer.start(ex.targetRest, { exIdx, setIdx: setIdx + 1 });
+    if (!(isLastSet && isLastExercise)) timer.start({ exIdx, setIdx: setIdx + 1 });
+
+    /* Llevar la siguiente serie a la vista. Se espera al repintado para que
+       la fila ya tenga su altura definitiva y el destino no baile. */
+    requestAnimationFrame(() => {
+      const next = rows.current.get(`${exIdx}:${setIdx + 1}`) ?? rows.current.get(`${exIdx + 1}:0`);
+      next?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   };
 
   const elapsed = (Date.now() - active.start) / 1000;
@@ -100,8 +117,8 @@ export function Entreno({
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-title font-medium">{active.dayName}</h1>
-            <p className="tnum text-micro text-ink-faint">
-              {clock(elapsed)} · {live.done}/{live.total} series
+            <p className="text-micro text-ink-faint">
+              <SessionClock elapsed={elapsed} className="text-accent" /> · {live.done}/{live.total} series
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => setClosing(true)}>
@@ -128,6 +145,7 @@ export function Entreno({
             weightStep={store.settings.weightStep}
             prE1RM={pbs.get(ex.exerciseId)?.e1rm ?? null}
             onSetDone={handleSetDone}
+            registerRow={registerRow}
           />
         ))}
 
@@ -151,7 +169,6 @@ export function Entreno({
         <RestTimer
           timer={timer}
           contextLabel={nextUp ? `Luego: ${nextUp.name} · serie ${nextUp.setNumber}` : 'Última serie del entreno'}
-          defaultTarget={nextUp?.targetRest ?? store.settings.defaultRest}
           onFinish={() => haptic(12)}
         />
       </div>
@@ -173,6 +190,7 @@ export function Entreno({
               buzz
               onClick={() => {
                 if (timer.running) timer.stop();
+                timer.clear();
                 const id = finishSession(feel, note.trim() || undefined);
                 setClosing(false);
                 if (id) onFinished(id);
@@ -243,7 +261,7 @@ export function Entreno({
             block
             buzz
             onClick={() => {
-              if (timer.running) timer.stop();
+              timer.clear();
               discardSession();
               setConfirmDiscard(false);
               onExit();

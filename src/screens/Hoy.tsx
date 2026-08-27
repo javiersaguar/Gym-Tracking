@@ -93,8 +93,12 @@ export function Hoy({
             {day.exercises.map((e) => (
               <li key={e.id} className="flex items-baseline justify-between gap-4 border-b border-line py-3">
                 <span className="min-w-0 flex-1 truncate text-body text-ink">{e.name}</span>
-                <span className="tnum shrink-0 text-caption text-ink-faint">
-                  {e.plannedSets} × {e.repRange[0]}–{e.repRange[1]}
+                <span className="tnum shrink-0 text-caption">
+                  <span className="font-medium text-accent">{e.plannedSets}</span>
+                  <span className="text-ink-faint">
+                    {' '}
+                    × {e.repRange[0]}–{e.repRange[1]}
+                  </span>
                 </span>
               </li>
             ))}
@@ -156,8 +160,9 @@ export function Hoy({
                     style={{ width: `${Math.min(100, (b.sharePct / (focus[0]?.sharePct || 1)) * 100)}%` }}
                   />
                 </span>
-                <span className="tnum w-16 shrink-0 text-right text-caption text-ink-muted">
-                  {b.sets.toFixed(1)} ser.
+                <span className="tnum w-16 shrink-0 text-right text-caption font-medium text-accent">
+                  {b.sets.toFixed(1)}
+                  <span className="font-normal text-ink-faint"> ser.</span>
                 </span>
               </li>
             ))}

@@ -9,6 +9,7 @@ import { Entreno } from './screens/Entreno';
 import { Historial } from './screens/Historial';
 import { Hoy } from './screens/Hoy';
 import { Portada } from './screens/Portada';
+import { Registro } from './screens/Registro';
 import { Progreso } from './screens/Progreso';
 import { Resumen } from './screens/Resumen';
 import { Rutina } from './screens/Rutina';
@@ -18,7 +19,8 @@ import { Rutina } from './screens/Rutina';
 const TITLES: Record<string, string> = {
   '/hoy': 'Hoy',
   '/progreso': 'Progreso',
-  '/historial': 'Historial',
+  '/registro': 'Registro',
+  '/historial': 'Análisis',
   '/rutina': 'Rutina',
   '/ajustes': 'Ajustes',
 };
@@ -116,6 +118,8 @@ export default function App() {
         return <Hoy store={store} onStart={start} onResume={() => navigate('/entreno')} onNavigate={navigate} />;
       case '/progreso':
         return <Progreso store={store} />;
+      case '/registro':
+        return <Registro store={store} onToast={setToast} />;
       case '/historial':
         return <Historial store={store} onOpen={(id) => navigate(`/sesion/${id}`)} />;
       case '/rutina':

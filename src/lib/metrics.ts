@@ -2,20 +2,68 @@ import type { LoggedExercise, LoggedSet, Muscle, Session } from './types';
 import { MUSCLES } from './types';
 
 /* ────────────────────────────────────────────────────────────────────────────
- * Cómo se mide un entreno
+ * Cómo se mide un entreno cuando los descansos no son uniformes
  *
- * Tres números distintos, porque «progresar» no es una sola cosa:
+ * El problema: en un gimnasio lleno el descanso lo decide la cola de la
+ * prensa, no tú. Si el índice premiara hacer más trabajo por minuto, un día
+ * de esperas se leería como un bajón de forma, que es exactamente lo
+ * contrario de lo que pasó.
  *
- *   1. TONELAJE   Σ peso × repeticiones. El trabajo mecánico total.
- *   2. INTENSIDAD el mejor 1RM estimado (Epley). La fuerza pura.
- *   3. DENSIDAD   tonelaje ÷ tiempo, contando el descanso real. Cuánto
- *                 trabajo metes por minuto de gimnasio.
+ * La solución tiene tres piezas:
  *
- * Los tres se comparan contra la mediana de las últimas sesiones que tocaron
- * ese grupo y se resumen en un ÍNDICE DE PROGRESO donde 100 = igual que tu
- * media reciente. La mediana y no la media porque una sesión mala no debe
- * hundir el listón de las tres siguientes.
+ *   1. CURVA DE RECUPERACIÓN. Con el mismo peso, las repeticiones que puedes
+ *      hacer dependen de cuánto llevas parado, y esa curva se satura. Sirve
+ *      para predecir qué cabía esperar con el descanso que realmente tuviste.
+ *   2. CAPACIDAD AJUSTADA. Cada serie se traduce a «lo que habrías hecho
+ *      descansado», usando esa curva y el RIR. Comparar capacidades entre
+ *      sesiones ya no depende del descanso.
+ *   3. ATRIBUCIÓN. Al comparar dos sesiones se parte la diferencia en dos: la
+ *      que explica el descanso y la que es cambio real. Es lo que permite
+ *      decir «has subido un 8 %, pero 3 puntos son por haber descansado más».
+ *
+ * La densidad (trabajo por minuto) se sigue calculando, pero fuera del
+ * índice: es una medida de cómo estaba el gimnasio, no de cómo estás tú.
  * ──────────────────────────────────────────────────────────────────────── */
+
+/* ── 1. Curva de recuperación ────────────────────────────────────────────── */
+
+/**
+ * Fracción del rendimiento disponible tras `t` segundos de descanso, respecto
+ * a estar fresco. Exponencial saturante: sube rápido al principio y se aplana.
+ *
+ *   t=60s → 0,71    t=120s → 0,83    t=180s → 0,90    t=300s → 0,97
+ *
+ * Los valores son coherentes con lo publicado sobre intervalos de descanso y
+ * repeticiones sostenidas a carga fija. Es una media poblacional, no una
+ * medida tuya: sirve para descontar el efecto del descanso, no para predecir
+ * tu serie exacta.
+ */
+export const RECOVERY_FLOOR = 0.5;
+export const RECOVERY_TAU = 110;
+
+export function recovery(restSec: number): number {
+  const t = Math.max(0, restSec);
+  return RECOVERY_FLOOR + (1 - RECOVERY_FLOOR) * (1 - Math.exp(-t / RECOVERY_TAU));
+}
+
+/** Desgaste acumulado dentro del mismo ejercicio: aunque descanses de sobra,
+ *  la cuarta serie no sale como la primera. */
+const CUMULATIVE_FATIGUE = 0.97;
+
+/**
+ * Rendimiento esperado de la serie `index` (0 = primera) con el descanso que
+ * tuvo, en fracción de lo que daría estando fresco.
+ *
+ * La primera serie de un ejercicio se toma como fresca: viene de cambiar de
+ * máquina, y su descanso previo no es comparable con el de entre series.
+ */
+export function expectedPerformance(index: number, restSec: number | null): number {
+  if (index === 0) return 1;
+  const rest = restSec ?? 120;
+  return recovery(rest) * CUMULATIVE_FATIGUE ** (index - 1);
+}
+
+/* ── 2. Capacidad ────────────────────────────────────────────────────────── */
 
 /** Segundos de trabajo estimados para una serie. Solo se mide el descanso;
  *  el tiempo bajo la barra se estima a ritmo estándar (~3,5 s por repetición
@@ -31,9 +79,54 @@ export function e1RM(weight: number, reps: number): number {
   return weight * (1 + Math.min(reps, 15) / 30);
 }
 
+/**
+ * 1RM estimado contando las repeticiones que quedaban en la recámara.
+ *
+ * Una serie de 7 con 3 de margen demuestra más fuerza que una de 7 al fallo,
+ * y sin el RIR las dos se apuntarían igual. Cuando no hay RIR se asume 0, que
+ * es lo conservador: se cuenta solo lo demostrado.
+ */
+export function e1RMCapacity(weight: number, reps: number, rir: number | null): number {
+  return e1RM(weight, reps + Math.max(0, rir ?? 0));
+}
+
+/**
+ * Capacidad demostrada por una serie: el 1RM estimado contando el RIR.
+ *
+ * A propósito **no** se divide por la curva de recuperación. Normalizar aquí
+ * parecía elegante y estaba mal: convertía «he hecho lo mismo descansando
+ * más» en una caída de fuerza del 20 %, con lo que el índice seguía bailando
+ * al ritmo de la cola de la prensa, solo que al revés. La fuerza es lo que
+ * levantaste; el efecto del descanso vive en el volumen, que es donde de
+ * verdad manda, y allí se descuenta.
+ */
+export function demonstratedCapacity(set: LoggedSet): number {
+  return e1RMCapacity(set.weight, set.reps, set.rir);
+}
+
+/**
+ * Cuánto limitó de verdad la fatiga a esta serie, de 0 a 1.
+ *
+ * Es la pieza que faltaba. Las series de esta rutina son prescritas: paras a
+ * las 8 porque pone 8, no porque no puedas más. Si te sobraban tres
+ * repeticiones, el descanso no decidió nada y no hay nada que descontar; solo
+ * cuando acabas cerca del fallo el descanso explica el resultado.
+ *
+ * Sin RIR apuntado se aplica un valor intermedio: ni se ignora el descanso ni
+ * se le atribuye todo el mérito.
+ */
+export function fatigueLimited(rir: number | null): number {
+  if (rir == null) return 0.6;
+  if (rir <= 1) return 1;
+  if (rir >= 4) return 0;
+  return (4 - rir) / 3;
+}
+
 export function isFilled(s: LoggedSet): boolean {
   return s.done && s.reps > 0;
 }
+
+/* ── Estadísticas por ejercicio ──────────────────────────────────────────── */
 
 export type ExerciseStats = {
   exerciseId: string;
@@ -44,9 +137,17 @@ export type ExerciseStats = {
   topE1RM: number;
   topSet: LoggedSet | null;
   heaviest: number;
+  /** Mejor capacidad demostrada (1RM estimado con el RIR dentro). */
+  capacity: number;
   restAvg: number | null;
+  /** Descansos medidos, en orden de serie. */
+  rests: (number | null)[];
+  rirAvg: number | null;
   timeSec: number;
   density: number;
+  /** Suma de lo que cabía esperar de cada serie según su descanso. Es el
+   *  denominador de la atribución. */
+  expectedSum: number;
 };
 
 export function exerciseStats(ex: LoggedExercise): ExerciseStats {
@@ -56,21 +157,31 @@ export function exerciseStats(ex: LoggedExercise): ExerciseStats {
   let topE1RM = 0;
   let topSet: LoggedSet | null = null;
   let heaviest = 0;
+  let capacity = 0;
   let timeSec = 0;
-  const rests: number[] = [];
+  let expectedSum = 0;
+  const restsMeasured: number[] = [];
+  const rirs: number[] = [];
+  const rests: (number | null)[] = [];
 
-  for (const s of done) {
+  done.forEach((s, i) => {
     tonnage += s.weight * s.reps;
     reps += s.reps;
     heaviest = Math.max(heaviest, s.weight);
+
     const est = e1RM(s.weight, s.reps);
     if (est > topE1RM) {
       topE1RM = est;
       topSet = s;
     }
+    capacity = Math.max(capacity, demonstratedCapacity(s));
+    expectedSum += expectedPerformance(i, s.restSec);
+
     timeSec += workSeconds(s.reps) + (s.restSec ?? 0);
-    if (s.restSec != null) rests.push(s.restSec);
-  }
+    rests.push(s.restSec);
+    if (s.restSec != null) restsMeasured.push(s.restSec);
+    if (s.rir != null) rirs.push(s.rir);
+  });
 
   return {
     exerciseId: ex.exerciseId,
@@ -81,11 +192,17 @@ export function exerciseStats(ex: LoggedExercise): ExerciseStats {
     topE1RM,
     topSet,
     heaviest,
-    restAvg: rests.length ? rests.reduce((a, b) => a + b, 0) / rests.length : null,
+    capacity,
+    restAvg: restsMeasured.length ? restsMeasured.reduce((a, b) => a + b, 0) / restsMeasured.length : null,
+    rests,
+    rirAvg: rirs.length ? rirs.reduce((a, b) => a + b, 0) / rirs.length : null,
     timeSec,
     density: timeSec > 0 ? tonnage / (timeSec / 60) : 0,
+    expectedSum,
   };
 }
+
+/* ── Estadísticas por grupo muscular ─────────────────────────────────────── */
 
 export type MuscleStats = {
   muscle: Muscle;
@@ -93,19 +210,35 @@ export type MuscleStats = {
    *  sobre este grupo, no 1 entera para todos los que participan. */
   sets: number;
   tonnage: number;
-  /** Mejor 1RM estimado entre los ejercicios en los que este grupo es el
+  /** Mejor capacidad demostrada entre los ejercicios donde este grupo es el
    *  principal (share ≥ 0,5). Sin ellos no hay dato de fuerza fiable. */
+  capacity: number;
+  /** Mejor 1RM estimado bruto, sin ajustar. Para enseñar la marca tal cual. */
   intensity: number;
+  rirAvg: number | null;
   timeSec: number;
   density: number;
+  expectedSum: number;
 };
 
 export function muscleStats(session: Session): Map<Muscle, MuscleStats> {
   const out = new Map<Muscle, MuscleStats>();
+  const rirAcc = new Map<Muscle, { sum: number; n: number }>();
+
   const get = (m: Muscle) => {
     let v = out.get(m);
     if (!v) {
-      v = { muscle: m, sets: 0, tonnage: 0, intensity: 0, timeSec: 0, density: 0 };
+      v = {
+        muscle: m,
+        sets: 0,
+        tonnage: 0,
+        capacity: 0,
+        intensity: 0,
+        rirAvg: null,
+        timeSec: 0,
+        density: 0,
+        expectedSum: 0,
+      };
       out.set(m, v);
     }
     return v;
@@ -120,15 +253,29 @@ export function muscleStats(session: Session): Map<Muscle, MuscleStats> {
       v.sets += st.sets * share;
       v.tonnage += st.tonnage * share;
       v.timeSec += st.timeSec * share;
-      if (share >= 0.5) v.intensity = Math.max(v.intensity, st.topE1RM);
+      v.expectedSum += st.expectedSum * share;
+      if (share >= 0.5) {
+        v.capacity = Math.max(v.capacity, st.capacity);
+        v.intensity = Math.max(v.intensity, st.topE1RM);
+      }
+      if (st.rirAvg != null) {
+        const acc = rirAcc.get(muscle) ?? { sum: 0, n: 0 };
+        acc.sum += st.rirAvg * share;
+        acc.n += share;
+        rirAcc.set(muscle, acc);
+      }
     }
   }
 
   for (const v of out.values()) {
     v.density = v.timeSec > 0 ? v.tonnage / (v.timeSec / 60) : 0;
+    const acc = rirAcc.get(v.muscle);
+    v.rirAvg = acc && acc.n > 0 ? acc.sum / acc.n : null;
   }
   return out;
 }
+
+/* ── Estadísticas de sesión ──────────────────────────────────────────────── */
 
 export type SessionStats = {
   durationSec: number;
@@ -137,6 +284,7 @@ export type SessionStats = {
   tonnage: number;
   restAvg: number | null;
   restTotal: number;
+  rirAvg: number | null;
   density: number;
   exercisesDone: number;
   exercisesPlanned: number;
@@ -151,6 +299,8 @@ export function sessionStats(session: Session): SessionStats {
   let exercisesDone = 0;
   let planned = 0;
   let estTime = 0;
+  let rirSum = 0;
+  let rirCount = 0;
 
   for (const ex of session.exercises) {
     if (!ex.skipped) planned += 1;
@@ -161,18 +311,22 @@ export function sessionStats(session: Session): SessionStats {
     tonnage += st.tonnage;
     estTime += st.timeSec;
     for (const s of ex.sets) {
-      if (isFilled(s) && s.restSec != null) {
+      if (!isFilled(s)) continue;
+      if (s.restSec != null) {
         restTotal += s.restSec;
         restCount += 1;
+      }
+      if (s.rir != null) {
+        rirSum += s.rir;
+        rirCount += 1;
       }
     }
   }
 
   /* El reloj de pared es la medida buena, pero acotada por los dos extremos
      absurdos: por abajo no se pueden hacer las series en menos tiempo del que
-     ocupan (pasa al probar o al apuntar un entreno a posteriori, y dispararía
-     la densidad a miles de kg/min); por arriba, una sesión que se quedó
-     abierta toda la noche no duró nueve horas. */
+     ocupan; por arriba, una sesión que se quedó abierta toda la noche no duró
+     nueve horas. */
   const wall = ((session.end ?? Date.now()) - session.start) / 1000;
   const durationSec = Math.min(Math.max(wall, estTime), estTime * 3 + 1800);
 
@@ -183,13 +337,14 @@ export function sessionStats(session: Session): SessionStats {
     tonnage,
     restAvg: restCount ? restTotal / restCount : null,
     restTotal,
+    rirAvg: rirCount ? rirSum / rirCount : null,
     density: durationSec > 0 ? tonnage / (durationSec / 60) : 0,
     exercisesDone,
     exercisesPlanned: planned,
   };
 }
 
-/* ── Índice de progreso ──────────────────────────────────────────────────── */
+/* ── 3. Progreso con atribución del descanso ─────────────────────────────── */
 
 function median(xs: number[]): number {
   if (!xs.length) return 0;
@@ -198,21 +353,33 @@ function median(xs: number[]): number {
   return s.length % 2 ? (s[mid] as number) : (((s[mid - 1] as number) + (s[mid] as number)) / 2);
 }
 
-/** Cuánto pesa cada componente en el índice. El tonelaje manda porque es lo
- *  que más se mueve sesión a sesión; la densidad puntúa poco porque un día
- *  con más cola en las máquinas no significa que hayas entrenado peor. */
-const W = { tonnage: 0.45, intensity: 0.35, density: 0.2 } as const;
-
 /** Cuántas sesiones anteriores forman el listón. */
 export const BASELINE_WINDOW = 3;
+
+/**
+ * Cuánto pesa cada componente del índice.
+ *
+ * La densidad ya no entra: era justo la que castigaba esperar por una
+ * máquina. El volumen sí, pero ya descontado el efecto del descanso.
+ */
+const W = { capacity: 0.55, volume: 0.45 } as const;
 
 export type MuscleProgress = {
   muscle: Muscle;
   current: MuscleStats;
   /** null en la primera sesión que toca ese grupo: no hay con qué comparar. */
   index: number | null;
-  baseline: { tonnage: number; intensity: number; density: number; samples: number } | null;
-  parts: { tonnage: number | null; intensity: number | null; density: number | null };
+  baseline: { capacity: number; tonnage: number; expectedSum: number; samples: number } | null;
+  parts: {
+    /** Cambio de fuerza, ya limpio de descanso y con el RIR dentro. */
+    capacity: number | null;
+    /** Cambio de volumen tal cual, descanso incluido. */
+    volume: number | null;
+    /** Parte del cambio de volumen que explica solo la diferencia de descanso. */
+    restEffect: number | null;
+    /** Lo que queda del volumen una vez descontado el descanso. */
+    volumeAdjusted: number | null;
+  };
 };
 
 function ratio(now: number, base: number): number | null {
@@ -221,7 +388,9 @@ function ratio(now: number, base: number): number | null {
 }
 
 /**
- * Compara una sesión contra las anteriores del histórico, grupo por grupo.
+ * Compara una sesión contra las anteriores, grupo por grupo, separando lo que
+ * explica el descanso de lo que es cambio real.
+ *
  * `history` debe venir ordenado de más reciente a más antiguo y **no** incluir
  * la sesión que se está evaluando.
  */
@@ -244,34 +413,43 @@ export function muscleProgress(session: Session, history: Session[]): MuscleProg
         current,
         index: null,
         baseline: null,
-        parts: { tonnage: null, intensity: null, density: null },
+        parts: { capacity: null, volume: null, restEffect: null, volumeAdjusted: null },
       });
       continue;
     }
 
     const baseline = {
+      capacity: median(samples.map((s) => s.capacity)),
       tonnage: median(samples.map((s) => s.tonnage)),
-      intensity: median(samples.map((s) => s.intensity)),
-      density: median(samples.map((s) => s.density)),
+      expectedSum: median(samples.map((s) => s.expectedSum)),
       samples: samples.length,
     };
 
-    const parts = {
-      tonnage: ratio(current.tonnage, baseline.tonnage),
-      intensity: ratio(current.intensity, baseline.intensity),
-      density: ratio(current.density, baseline.density),
-    };
+    const capacityRatio = ratio(current.capacity, baseline.capacity);
+    const volumeRatio = ratio(current.tonnage, baseline.tonnage);
 
-    /* Si falta un componente (p. ej. no hay dato de fuerza porque el grupo
-       solo entró como secundario) se reparte su peso entre los que sí hay,
-       en vez de contarlo como cero y castigar por un hueco. */
+    /* El efecto del descanso: cuánto trabajo cabía esperar hoy frente a lo que
+       cabía esperar en la referencia, dados los descansos de cada día. Se
+       amortigua según lo cerca del fallo que se llegara: si sobraban
+       repeticiones, el descanso no limitó nada y no hay nada que descontar. */
+    const raw = ratio(current.expectedSum, baseline.expectedSum);
+    const damp = fatigueLimited(current.rirAvg);
+    const restEffect = raw != null ? 1 + (raw - 1) * damp : null;
+
+    const volumeAdjusted =
+      volumeRatio != null && restEffect != null && restEffect > 0
+        ? Math.min(3, volumeRatio / restEffect)
+        : volumeRatio;
+
     let num = 0;
     let den = 0;
-    for (const k of ['tonnage', 'intensity', 'density'] as const) {
-      const r = parts[k];
-      if (r == null) continue;
-      num += W[k] * r;
-      den += W[k];
+    if (capacityRatio != null) {
+      num += W.capacity * capacityRatio;
+      den += W.capacity;
+    }
+    if (volumeAdjusted != null) {
+      num += W.volume * volumeAdjusted;
+      den += W.volume;
     }
 
     out.push({
@@ -279,7 +457,7 @@ export function muscleProgress(session: Session, history: Session[]): MuscleProg
       current,
       index: den > 0 ? Math.round((num / den) * 100) : null,
       baseline,
-      parts,
+      parts: { capacity: capacityRatio, volume: volumeRatio, restEffect, volumeAdjusted },
     });
   }
 
@@ -299,6 +477,65 @@ export function sessionIndex(progress: MuscleProgress[]): number | null {
     den += w;
   }
   return den > 0 ? Math.round(num / den) : null;
+}
+
+export type Attribution = {
+  /** Cambio total de volumen frente a la referencia, en %. */
+  totalPct: number;
+  /** Parte explicada por haber descansado más o menos, en %. */
+  restPct: number;
+  /** Parte que no explica el descanso: cambio real, en %. */
+  realPct: number;
+  /** Diferencia de descanso medio frente a la referencia, en segundos. */
+  restDeltaSec: number | null;
+  /** Cuánto del movimiento total explica el descanso, de 0 a 1. */
+  restShare: number;
+};
+
+/**
+ * Reparte el cambio de volumen de una sesión entre lo que explica el descanso
+ * y lo que es cambio real. Es la respuesta a «¿he mejorado o es que hoy había
+ * cola en la prensa?».
+ *
+ * El reparto es multiplicativo —total = descanso × real— porque los efectos
+ * se componen, no se suman; en porcentajes pequeños se lee casi igual.
+ */
+export function attribution(session: Session, history: Session[]): Attribution | null {
+  const progress = muscleProgress(session, history);
+  const usable = progress.filter((p) => p.parts.volume != null && p.parts.restEffect != null);
+  if (!usable.length) return null;
+
+  let wSum = 0;
+  let total = 0;
+  let rest = 0;
+  for (const p of usable) {
+    const w = Math.max(p.current.tonnage, 1);
+    total += (p.parts.volume as number) * w;
+    rest += (p.parts.restEffect as number) * w;
+    wSum += w;
+  }
+  const totalRatio = total / wSum;
+  const restRatio = rest / wSum;
+  const realRatio = restRatio > 0 ? totalRatio / restRatio : totalRatio;
+
+  const nowRest = sessionStats(session).restAvg;
+  const baseRests = history
+    .slice(0, BASELINE_WINDOW)
+    .map((s) => sessionStats(s).restAvg)
+    .filter((x): x is number => x != null);
+
+  const totalPct = (totalRatio - 1) * 100;
+  const restPct = (restRatio - 1) * 100;
+  const realPct = (realRatio - 1) * 100;
+  const magnitude = Math.abs(restPct) + Math.abs(realPct);
+
+  return {
+    totalPct,
+    restPct,
+    realPct,
+    restDeltaSec: nowRest != null && baseRests.length ? nowRest - median(baseRests) : null,
+    restShare: magnitude > 0 ? Math.abs(restPct) / magnitude : 0,
+  };
 }
 
 /* ── Récords ─────────────────────────────────────────────────────────────── */
@@ -365,6 +602,32 @@ export function prsInSession(
   return hits.sort((a, b) => b.e1rm / b.prev - a.e1rm / a.prev);
 }
 
+/** Mejor peso levantado a cada número de repeticiones, para un ejercicio. */
+export type RepRecord = { reps: number; weight: number; at: number; rir: number | null; e1rm: number };
+
+export function repMaxTable(sessions: Session[], exerciseId: string): RepRecord[] {
+  const best = new Map<number, RepRecord>();
+  for (const s of sessions) {
+    for (const ex of s.exercises) {
+      if (ex.exerciseId !== exerciseId) continue;
+      for (const set of ex.sets) {
+        if (!isFilled(set)) continue;
+        const prev = best.get(set.reps);
+        if (!prev || set.weight > prev.weight) {
+          best.set(set.reps, {
+            reps: set.reps,
+            weight: set.weight,
+            at: set.at || s.start,
+            rir: set.rir,
+            e1rm: e1RM(set.weight, set.reps),
+          });
+        }
+      }
+    }
+  }
+  return [...best.values()].sort((a, b) => a.reps - b.reps);
+}
+
 /* ── Reparto de volumen a lo largo del tiempo ────────────────────────────── */
 
 export type Balance = {
@@ -374,6 +637,9 @@ export type Balance = {
   /** Series efectivas por semana dentro de la ventana consultada. */
   setsPerWeek: number;
   sharePct: number;
+  /** Sesiones por semana que han tocado el grupo. */
+  freqPerWeek: number;
+  rirAvg: number | null;
 };
 
 /** Rango semanal de series efectivas que se toma como referencia razonable
@@ -397,12 +663,18 @@ export function balance(sessions: Session[], days: number, now = Date.now()): Ba
   const inWindow = sessions.filter((s) => s.start >= from);
   const weeks = Math.max(days / 7, 1);
 
-  const acc = new Map<Muscle, { sets: number; tonnage: number }>();
+  const acc = new Map<Muscle, { sets: number; tonnage: number; days: Set<number>; rirSum: number; rirN: number }>();
   for (const s of inWindow) {
+    const dayKey = new Date(s.start).setHours(0, 0, 0, 0);
     for (const [m, st] of muscleStats(s)) {
-      const v = acc.get(m) ?? { sets: 0, tonnage: 0 };
+      const v = acc.get(m) ?? { sets: 0, tonnage: 0, days: new Set<number>(), rirSum: 0, rirN: 0 };
       v.sets += st.sets;
       v.tonnage += st.tonnage;
+      if (st.sets >= 0.5) v.days.add(dayKey);
+      if (st.rirAvg != null) {
+        v.rirSum += st.rirAvg;
+        v.rirN += 1;
+      }
       acc.set(m, v);
     }
   }
@@ -410,25 +682,71 @@ export function balance(sessions: Session[], days: number, now = Date.now()): Ba
   const totalTonnage = [...acc.values()].reduce((a, b) => a + b.tonnage, 0);
 
   return MUSCLES.map((muscle) => {
-    const v = acc.get(muscle) ?? { sets: 0, tonnage: 0 };
+    const v = acc.get(muscle);
     return {
       muscle,
-      sets: v.sets,
-      tonnage: v.tonnage,
-      setsPerWeek: v.sets / weeks,
-      sharePct: totalTonnage > 0 ? (v.tonnage / totalTonnage) * 100 : 0,
+      sets: v?.sets ?? 0,
+      tonnage: v?.tonnage ?? 0,
+      setsPerWeek: (v?.sets ?? 0) / weeks,
+      sharePct: totalTonnage > 0 ? ((v?.tonnage ?? 0) / totalTonnage) * 100 : 0,
+      freqPerWeek: (v?.days.size ?? 0) / weeks,
+      rirAvg: v && v.rirN > 0 ? v.rirSum / v.rirN : null,
     };
   }).sort((a, b) => b.tonnage - a.tonnage);
+}
+
+/** Tonelaje total acumulado por ejercicio dentro de una ventana. */
+export type ExerciseVolume = {
+  exerciseId: string;
+  name: string;
+  tonnage: number;
+  sets: number;
+  reps: number;
+  sessions: number;
+  bestE1RM: number;
+};
+
+export function exerciseVolumes(sessions: Session[], days: number, now = Date.now()): ExerciseVolume[] {
+  const from = now - days * 86_400_000;
+  const acc = new Map<string, ExerciseVolume>();
+
+  for (const s of sessions) {
+    if (s.start < from) continue;
+    for (const ex of s.exercises) {
+      const st = exerciseStats(ex);
+      if (st.sets === 0) continue;
+      const v = acc.get(ex.exerciseId) ?? {
+        exerciseId: ex.exerciseId,
+        name: ex.name,
+        tonnage: 0,
+        sets: 0,
+        reps: 0,
+        sessions: 0,
+        bestE1RM: 0,
+      };
+      v.tonnage += st.tonnage;
+      v.sets += st.sets;
+      v.reps += st.reps;
+      v.sessions += 1;
+      v.bestE1RM = Math.max(v.bestE1RM, st.topE1RM);
+      acc.set(ex.exerciseId, v);
+    }
+  }
+  return [...acc.values()].sort((a, b) => b.tonnage - a.tonnage);
 }
 
 /* ── Series temporales para los gráficos ─────────────────────────────────── */
 
 export type Point = { at: number; value: number; label?: string };
 
-/** Evolución del 1RM estimado de un ejercicio, de más antiguo a más reciente. */
-export function exerciseSeries(sessions: Session[], exerciseId: string): { e1rm: Point[]; tonnage: Point[] } {
+/** Evolución del ejercicio, de más antiguo a más reciente. */
+export function exerciseSeries(
+  sessions: Session[],
+  exerciseId: string,
+): { e1rm: Point[]; tonnage: Point[]; capacity: Point[] } {
   const e1rm: Point[] = [];
   const tonnage: Point[] = [];
+  const capacity: Point[] = [];
   const ordered = [...sessions].sort((a, b) => a.start - b.start);
 
   for (const s of ordered) {
@@ -438,8 +756,9 @@ export function exerciseSeries(sessions: Session[], exerciseId: string): { e1rm:
     if (st.sets === 0) continue;
     e1rm.push({ at: s.start, value: st.topE1RM });
     tonnage.push({ at: s.start, value: st.tonnage });
+    capacity.push({ at: s.start, value: st.capacity });
   }
-  return { e1rm, tonnage };
+  return { e1rm, tonnage, capacity };
 }
 
 /** Evolución del tonelaje de un grupo muscular sesión a sesión. */
@@ -449,6 +768,41 @@ export function muscleSeries(sessions: Session[], muscle: Muscle): Point[] {
     .map((s) => ({ at: s.start, stats: muscleStats(s).get(muscle) }))
     .filter((x): x is { at: number; stats: MuscleStats } => !!x.stats && x.stats.sets >= 0.5)
     .map((x) => ({ at: x.at, value: x.stats.tonnage }));
+}
+
+/**
+ * Puntos de descanso frente a rendimiento para un ejercicio: cada serie que
+ * no sea la primera, con el descanso que la precedió y las repeticiones que
+ * salieron respecto a la primera serie de ese día.
+ *
+ * Sirve para mirar con los ojos si la fórmula se parece a tu realidad, en vez
+ * de tener que creérsela.
+ */
+export type RestPoint = { rest: number; ratio: number; at: number; weight: number; reps: number };
+
+export function restVsPerformance(sessions: Session[], exerciseId: string): RestPoint[] {
+  const points: RestPoint[] = [];
+  for (const s of sessions) {
+    for (const ex of s.exercises) {
+      if (ex.exerciseId !== exerciseId) continue;
+      const done = ex.sets.filter(isFilled);
+      const first = done[0];
+      if (!first || first.reps <= 0) continue;
+      done.forEach((set, i) => {
+        if (i === 0 || set.restSec == null) return;
+        /* Solo tiene sentido comparar repeticiones a la misma carga. */
+        if (Math.abs(set.weight - first.weight) > 0.01) return;
+        points.push({
+          rest: set.restSec,
+          ratio: set.reps / first.reps,
+          at: set.at || s.start,
+          weight: set.weight,
+          reps: set.reps,
+        });
+      });
+    }
+  }
+  return points.sort((a, b) => a.rest - b.rest);
 }
 
 /** Tendencia simple por mínimos cuadrados. Devuelve el % de cambio entre el

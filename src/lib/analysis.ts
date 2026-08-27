@@ -1,11 +1,13 @@
 import { clock, duration, kg, plural, tonnage } from './format';
 import {
+  attribution,
   exerciseStats,
   isFilled,
   muscleProgress,
   prsInSession,
   sessionIndex,
   sessionStats,
+  type Attribution,
   type MuscleProgress,
   type PrHit,
   type SessionStats,
@@ -37,7 +39,9 @@ export type ExerciseReview = {
   /** Comparación con la última vez que se hizo el ejercicio. */
   deltaPct: number | null;
   restAvg: number | null;
-  targetRest: number;
+  rirAvg: number | null;
+  /** Capacidad ajustada por descanso y RIR. Es la cifra de fuerza limpia. */
+  capacity: number;
   advice: { move: 'sube' | 'mantiene' | 'baja' | 'nuevo'; text: string };
 };
 
@@ -50,6 +54,8 @@ export type Analysis = {
   prs: PrHit[];
   notes: Note[];
   exercises: ExerciseReview[];
+  /** Reparto del cambio entre descanso y mejora real. Null la primera vez. */
+  attribution: Attribution | null;
 };
 
 function lastTimeStats(history: Session[], exerciseId: string) {
@@ -66,6 +72,10 @@ function lastTimeStats(history: Session[], exerciseId: string) {
  * Qué hacer la próxima vez con este ejercicio. La regla es la progresión
  * doble de toda la vida: primero llenas el rango de repeticiones, y cuando
  * todas las series llegan arriba, subes el peso.
+ *
+ * El RIR manda por encima del rango: si cerraste el rango pero te sobraban
+ * tres repeticiones, el peso se queda corto aunque el número diga que vas
+ * bien.
  */
 function advise(ex: LoggedExercise, step: number): ExerciseReview['advice'] {
   const done = ex.sets.filter(isFilled);
@@ -75,6 +85,16 @@ function advise(ex: LoggedExercise, step: number): ExerciseReview['advice'] {
   const allTop = done.every((s) => s.reps >= high);
   const anyBelow = done.some((s) => s.reps < low);
   const topWeight = Math.max(...done.map((s) => s.weight));
+
+  const rirs = done.map((s) => s.rir).filter((x): x is number => x != null);
+  const minRir = rirs.length ? Math.min(...rirs) : null;
+
+  if (minRir != null && minRir >= 3 && !anyBelow) {
+    return {
+      move: 'sube',
+      text: `Ni en la serie más dura bajaste de RIR ${minRir}: el peso te queda corto. Sube a ${kg(topWeight + step * 2)} kg.`,
+    };
+  }
 
   if (allTop) {
     return {
@@ -137,16 +157,18 @@ export function analyse(
         best: st.topSet ? `${kg(st.topSet.weight)} × ${st.topSet.reps}` : '—',
         deltaPct,
         restAvg: st.restAvg,
-        targetRest: ex.targetRest,
+        rirAvg: st.rirAvg,
+        capacity: st.capacity,
         advice: advise(ex, weightStep),
       } satisfies ExerciseReview;
     })
     .filter((x): x is ExerciseReview => x !== null);
 
-  const notes = buildNotes({ session, history, stats, muscles, prs, exercises });
+  const attr = attribution(session, history);
+  const notes = buildNotes({ session, history, stats, muscles, prs, exercises, attr });
   const headline = buildHeadline(verdict, index, stats, prs, muscles);
 
-  return { stats, index, verdict, headline, muscles, prs, notes, exercises };
+  return { stats, index, verdict, headline, muscles, prs, notes, exercises, attribution: attr };
 }
 
 function buildHeadline(
@@ -186,9 +208,39 @@ function buildNotes(input: {
   muscles: MuscleProgress[];
   prs: PrHit[];
   exercises: ExerciseReview[];
+  attr: Attribution | null;
 }): Note[] {
-  const { session, history, stats, muscles, prs, exercises } = input;
+  const { session, history, stats, muscles, prs, exercises, attr } = input;
   const notes: Note[] = [];
+
+  /* Lo primero de todo: repartir el movimiento entre el descanso y tú.
+     Salta también cuando el volumen parece plano, porque el caso que más
+     despista es justo ese: mismo tonelaje con el doble de descanso no es
+     «igual que siempre», es haber rendido algo menos. */
+  if (attr && (Math.abs(attr.totalPct) >= 3 || Math.abs(attr.realPct) >= 3)) {
+    const pct = (n: number) => Math.abs(n).toFixed(0);
+    const restBit =
+      attr.restDeltaSec != null && Math.abs(attr.restDeltaSec) >= 15
+        ? `descansaste ${clock(Math.abs(attr.restDeltaSec))} ${attr.restDeltaSec > 0 ? 'más' : 'menos'} de media`
+        : 'los descansos cambiaron';
+
+    if (Math.abs(attr.totalPct) < 3) {
+      notes.push({
+        kind: attr.realPct > 0 ? 'good' : 'watch',
+        text: `El tonelaje sale casi igual que tu referencia, pero ${restBit}. Descontado el descanso, has rendido un ${pct(attr.realPct)} % ${attr.realPct > 0 ? 'por encima' : 'por debajo'}.`,
+      });
+    } else if (attr.restShare >= 0.35) {
+      notes.push({
+        kind: attr.realPct > 0 ? 'good' : 'watch',
+        text: `Has ${attr.totalPct > 0 ? 'subido' : 'bajado'} un ${pct(attr.totalPct)} % de volumen. De eso, ${pct(attr.restPct)} puntos son porque ${restBit}; los otros ${pct(attr.realPct)} son cambio real.`,
+      });
+    } else {
+      notes.push({
+        kind: attr.realPct > 0 ? 'good' : 'watch',
+        text: `Has ${attr.totalPct > 0 ? 'subido' : 'bajado'} un ${pct(attr.totalPct)} % y el descanso apenas lo explica: es cambio real.`,
+      });
+    }
+  }
 
   for (const pr of prs.slice(0, 3)) {
     notes.push({
@@ -197,21 +249,33 @@ function buildNotes(input: {
     });
   }
 
-  /* Descanso: se compara el real contra el objetivo del propio ejercicio,
-     no contra un número global. Un gemelo y una prensa no descansan igual. */
-  const withRest = exercises.filter((e) => e.restAvg != null);
-  if (withRest.length >= 2) {
-    const diffs = withRest.map((e) => (e.restAvg as number) - e.targetRest);
-    const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
-    if (avgDiff > 45) {
-      notes.push({
-        kind: 'watch',
-        text: `Has descansado de media ${clock(avgDiff)} más de lo previsto. Si el objetivo es densidad, cierra los descansos; si buscabas fuerza, está bien gastado.`,
-      });
-    } else if (avgDiff < -30) {
+  /* Cuánto variaron los descansos dentro de la propia sesión. No es bueno ni
+     malo —depende de la cola que hubiera— pero explica por qué unas series
+     salieron mejor que otras. */
+  const allRests = session.exercises
+    .flatMap((ex) => ex.sets.filter(isFilled).map((s) => s.restSec))
+    .filter((x): x is number => x != null);
+  if (allRests.length >= 4) {
+    const min = Math.min(...allRests);
+    const max = Math.max(...allRests);
+    if (max - min > 120) {
       notes.push({
         kind: 'info',
-        text: `Descansos ${clock(-avgDiff)} más cortos de lo previsto: sube la densidad, pero espera perder alguna repetición en las series finales.`,
+        text: `Tus descansos fueron de ${clock(min)} a ${clock(max)}. El índice ya descuenta esa diferencia, así que la comparación con otros días sigue valiendo.`,
+      });
+    }
+  }
+
+  if (stats.rirAvg != null) {
+    if (stats.rirAvg >= 3) {
+      notes.push({
+        kind: 'watch',
+        text: `RIR medio de ${stats.rirAvg.toFixed(1)}: te has dejado bastante margen. Si buscabas estímulo, faltó apretar.`,
+      });
+    } else if (stats.rirAvg <= 0.5) {
+      notes.push({
+        kind: 'info',
+        text: `RIR medio de ${stats.rirAvg.toFixed(1)}: casi todo al fallo. Rinde, pero es difícil de sostener muchas semanas seguidas.`,
       });
     }
   }

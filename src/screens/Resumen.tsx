@@ -94,6 +94,64 @@ export function Resumen({
         </Card>
       </motion.div>
 
+      {analysis.attribution && Math.abs(analysis.attribution.totalPct) >= 1 && (
+        <section>
+          <SectionTitle>Descanso o mejora real</SectionTitle>
+          <Card className="p-5">
+            <p className="text-caption text-ink-muted">
+              El volumen de esta sesión frente a tu referencia, partido en dos: lo que explica haber descansado
+              distinto y lo que es cambio tuyo.
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
+              <div className="bg-paper px-3 py-2.5">
+                <p className="text-micro text-ink-faint">Total</p>
+                <p className="tnum mt-0.5 text-caption font-medium text-ink">
+                  {signedPct(analysis.attribution.totalPct)}
+                </p>
+              </div>
+              <div className="bg-paper px-3 py-2.5">
+                <p className="text-micro text-ink-faint">Por descanso</p>
+                <p className="tnum mt-0.5 text-caption font-medium text-ink-muted">
+                  {signedPct(analysis.attribution.restPct)}
+                </p>
+              </div>
+              <div className="bg-paper px-3 py-2.5">
+                <p className="text-micro text-ink-faint">Real</p>
+                <p
+                  className={cx(
+                    'tnum mt-0.5 text-caption font-medium',
+                    analysis.attribution.realPct > 1
+                      ? 'text-good-ink'
+                      : analysis.attribution.realPct < -1
+                        ? 'text-warn-ink'
+                        : 'text-ink',
+                  )}
+                >
+                  {signedPct(analysis.attribution.realPct)}
+                </p>
+              </div>
+            </div>
+            {/* Barra de reparto: cuánto del movimiento explica el descanso. */}
+            <div className="mt-3 h-[6px] overflow-hidden rounded-[3px] bg-line-soft">
+              <div
+                className="h-full rounded-[3px] bg-ink-faint"
+                style={{
+                  width: `${Math.round(analysis.attribution.restShare * 100)}%`,
+                  transition: 'width 420ms cubic-bezier(.16,1,.3,1)',
+                }}
+              />
+            </div>
+            <p className="mt-2 text-micro text-ink-faint">
+              El descanso explica un {Math.round(analysis.attribution.restShare * 100)} % del movimiento
+              {analysis.attribution.restDeltaSec != null &&
+                Math.abs(analysis.attribution.restDeltaSec) >= 15 &&
+                ` · ${clock(Math.abs(analysis.attribution.restDeltaSec))} ${analysis.attribution.restDeltaSec > 0 ? 'más' : 'menos'} de media`}
+              .
+            </p>
+          </Card>
+        </section>
+      )}
+
       {prs.length > 0 && (
         <section>
           <SectionTitle>Récords</SectionTitle>
@@ -174,6 +232,7 @@ export function Resumen({
                   <p className="tnum mt-1 text-micro text-ink-faint">
                     {plural(e.sets, 'serie')} · mejor {e.best} · {tonnage(e.tonnage)}
                     {e.restAvg != null && ` · descanso ${clock(e.restAvg)}`}
+                    {e.rirAvg != null && ` · RIR ${e.rirAvg.toFixed(1)}`}
                   </p>
                 </div>
                 {e.deltaPct != null && (
@@ -256,10 +315,12 @@ export function Resumen({
 
 function MuscleRow({ progress }: { progress: MuscleProgress }) {
   const tone = indexTone(progress.index);
+  /* Fuerza y volumen ajustado son las dos piezas del índice. El efecto del
+     descanso se enseña aparte y en gris: no puntúa, explica. */
   const parts: [string, number | null][] = [
-    ['Tonelaje', progress.parts.tonnage],
-    ['Intensidad', progress.parts.intensity],
-    ['Densidad', progress.parts.density],
+    ['Fuerza', progress.parts.capacity],
+    ['Volumen', progress.parts.volumeAdjusted],
+    ['Por descanso', progress.parts.restEffect],
   ];
 
   return (
@@ -281,19 +342,29 @@ function MuscleRow({ progress }: { progress: MuscleProgress }) {
 
       {progress.baseline && (
         <dl className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
-          {parts.map(([label, r]) => (
-            <div key={label} className="bg-paper px-3 py-2">
-              <dt className="text-micro text-ink-faint">{label}</dt>
-              <dd
-                className={cx(
-                  'tnum mt-0.5 text-caption font-medium',
-                  r == null ? 'text-ink-faint' : r > 1.02 ? 'text-good-ink' : r < 0.98 ? 'text-warn-ink' : 'text-ink',
-                )}
-              >
-                {r == null ? 'sin dato' : signedPct((r - 1) * 100)}
-              </dd>
-            </div>
-          ))}
+          {parts.map(([label, r], i) => {
+            /* El tercero es contexto, no mérito: nunca se pinta de color. */
+            const neutral = i === 2;
+            return (
+              <div key={label} className="bg-paper px-3 py-2">
+                <dt className="text-micro text-ink-faint">{label}</dt>
+                <dd
+                  className={cx(
+                    'tnum mt-0.5 text-caption font-medium',
+                    r == null || neutral
+                      ? 'text-ink-faint'
+                      : r > 1.02
+                        ? 'text-good-ink'
+                        : r < 0.98
+                          ? 'text-warn-ink'
+                          : 'text-ink',
+                  )}
+                >
+                  {r == null ? 'sin dato' : signedPct((r - 1) * 100)}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       )}
       {!progress.baseline && (

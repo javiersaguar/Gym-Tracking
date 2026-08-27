@@ -75,5 +75,6 @@ export function daysBetween(a: number, b: number): number {
 /** «1 entreno» / «4 entrenos». El plural en «s» cubre todo lo que cuenta
  *  esta app: entrenos, series, ejercicios, días. */
 export function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
-  return `${n.toLocaleString('es-ES')} ${n === 1 ? singular : pluralForm}`;
+  const shown = Number.isInteger(n) ? n.toLocaleString('es-ES') : n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+  return `${shown} ${n === 1 ? singular : pluralForm}`;
 }

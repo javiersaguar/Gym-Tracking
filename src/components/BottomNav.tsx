@@ -35,6 +35,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M7.2 12h9.6" strokeLinecap="round" />
     </>
   ),
+  registro: (
+    <>
+      <rect x="4.2" y="3.4" width="15.6" height="17.2" rx="2.4" />
+      <path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" />
+    </>
+  ),
 };
 
 export type NavItem = { path: string; label: string; icon: keyof typeof ICONS };
@@ -42,7 +48,8 @@ export type NavItem = { path: string; label: string; icon: keyof typeof ICONS };
 export const NAV: NavItem[] = [
   { path: '/hoy', label: 'Hoy', icon: 'hoy' },
   { path: '/progreso', label: 'Progreso', icon: 'progreso' },
-  { path: '/historial', label: 'Historial', icon: 'historial' },
+  { path: '/registro', label: 'Registro', icon: 'registro' },
+  { path: '/historial', label: 'Análisis', icon: 'historial' },
   { path: '/rutina', label: 'Rutina', icon: 'rutina' },
 ];
 
@@ -96,7 +103,7 @@ export function BottomNav({
       className="chrome fixed inset-x-0 bottom-0 z-40 border-t border-line"
       aria-hidden={hidden}
     >
-      <ul className="safe-bottom mx-auto flex max-w-lg items-stretch px-3 pt-2">
+      <ul className="safe-bottom mx-auto flex max-w-lg items-stretch px-1.5 pt-2">
         {NAV.map((item) => {
           const active = path === item.path;
           return (

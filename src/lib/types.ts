@@ -48,8 +48,6 @@ export type Exercise = {
   loadKind: LoadKind;
   /** Series previstas. Se pueden añadir y quitar dentro del entreno. */
   plannedSets: number;
-  /** Descanso objetivo en segundos: alimenta el cronómetro y la densidad. */
-  targetRest: number;
   /** Ventana de repeticiones a la que apunta el ejercicio. */
   repRange: [number, number];
   notes?: string;
@@ -77,13 +75,24 @@ export type LoggedSet = {
   id: string;
   weight: number;
   reps: number;
-  /** Descanso *previo* a esta serie, en segundos. La primera serie no tiene. */
+  /**
+   * Descanso real medido antes de esta serie, en segundos.
+   *
+   * Se guarda también en la primera serie de cada ejercicio: ese es
+   * justamente el descanso de esperar a que se libere una máquina, que es el
+   * que más varía y el que más falta hace para descontar su efecto.
+   * Solo es nulo en la primerísima serie de la sesión, que no tiene un antes.
+   */
   restSec: number | null;
   /** Momento en que se marcó como hecha. */
   at: number;
   done: boolean;
-  /** RIR estimado por el usuario. Opcional: si no está, no penaliza. */
-  rir?: number | null;
+  /**
+   * Repeticiones que quedaban en la recámara (RIR). Es lo que separa «7 y
+   * podía con dos más» de «7 y me morí», y sin ello no hay forma de saber si
+   * una sesión floja fue falta de fuerza o falta de ganas.
+   */
+  rir: number | null;
 };
 
 export type LoggedExercise = {
@@ -93,7 +102,6 @@ export type LoggedExercise = {
   name: string;
   muscles: MuscleShare[];
   loadKind: LoadKind;
-  targetRest: number;
   repRange: [number, number];
   sets: LoggedSet[];
   /** Quitado del entreno de hoy sin tocar la rutina. */
@@ -115,14 +123,14 @@ export type Session = {
 };
 
 export type Settings = {
-  /** Descanso por defecto cuando el ejercicio no dice otra cosa. */
-  defaultRest: number;
-  /** Avisar con sonido/vibración al llegar al descanso objetivo. */
-  restAlert: boolean;
   /** Incremento del stepper de peso, en kg. */
   weightStep: number;
   /** Mantener la pantalla encendida durante el entreno. */
   keepAwake: boolean;
+  /** Cada cuántas sesiones recordar que hay que descargar una copia. */
+  backupEvery: number;
+  /** Sesiones guardadas la última vez que se descargó una copia. */
+  lastBackupCount: number;
 };
 
 export type Store = {

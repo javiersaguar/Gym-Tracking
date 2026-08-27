@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { getStore, subscribe } from './storage';
-import { elapsedSec, getTimer, resetAlert, ring, startRest, stopRest, subscribeTimer, takePending } from './timer';
+import { clearTimer, elapsedSec, getTimer, startRest, stopRest, subscribeTimer, takePending } from './timer';
 import type { Store } from './types';
 
 export function useStore(): Store {
@@ -21,38 +21,28 @@ export function useTick(ms: number): number {
 export type RestTimer = {
   running: boolean;
   elapsed: number;
-  target: number;
   slot: { exIdx: number; setIdx: number } | null;
-  start: (target: number, slot?: { exIdx: number; setIdx: number } | null) => void;
+  start: (slot?: { exIdx: number; setIdx: number } | null) => void;
   stop: () => number;
+  clear: () => void;
   /** Descanso ya parado a mano y aún sin asignar a ninguna serie. */
   takePending: () => number | null;
 };
 
-export function useRestTimer(alertOnTarget: boolean): RestTimer {
+export function useRestTimer(): RestTimer {
   const snap = useSyncExternalStore(subscribeTimer, getTimer, getTimer);
-  useTick(snap.startedAt ? 200 : 0);
+  useTick(snap.startedAt ? 250 : 0);
 
   const elapsed = snap.startedAt ? elapsedSec() : 0;
 
-  /* El aviso se dispara aquí y no dentro del render del cronómetro para que
-     suene una sola vez aunque haya varios cronómetros en pantalla. */
-  useEffect(() => {
-    if (!alertOnTarget || !snap.startedAt) return;
-    if (elapsed >= snap.target) ring();
-  }, [alertOnTarget, snap.startedAt, snap.target, elapsed]);
-
-  const start = useCallback((target: number, slot: { exIdx: number; setIdx: number } | null = null) => {
-    resetAlert();
-    startRest(target, slot);
+  const start = useCallback((slot: { exIdx: number; setIdx: number } | null = null) => {
+    startRest(slot);
   }, []);
 
-  const stop = useCallback(() => {
-    resetAlert();
-    return stopRest();
-  }, []);
+  const stop = useCallback(() => stopRest(), []);
+  const clear = useCallback(() => clearTimer(), []);
 
-  return { running: !!snap.startedAt, elapsed, target: snap.target, slot: snap.slot, start, stop, takePending };
+  return { running: !!snap.startedAt, elapsed, slot: snap.slot, start, stop, clear, takePending };
 }
 
 /* ── Rutas ───────────────────────────────────────────────────────────────── */
