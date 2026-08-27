@@ -1,23 +1,27 @@
 name: Desplegar en GitHub Pages
 
+# Se comprueba cada rama, pero solo se publica la rama por defecto del repo.
+# Compararla con `default_branch` en vez de escribir «main» a mano evita que
+# el despliegue deje de dispararse por llamarse la rama de otra forma, que es
+# justo lo que pasaba aquí.
 on:
   push:
-    branches: [main, master]
+    branches: ['**']
+  pull_request:
   workflow_dispatch:
 
 # Un único despliegue a la vez; las ejecuciones en cola se descartan salvo la
 # última, que es la que refleja el estado real de la rama.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
-  build:
+  test:
+    name: Tests y compilación
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,27 +33,53 @@ jobs:
 
       - run: npm ci
 
-      - run: npm test
+      - name: Tests
+        run: npm test
 
-      # Pages sirve la app desde /<repo>/, no desde la raíz: el mismo valor lo
-      # usan Vite para las rutas de los assets y el service worker para saber
-      # qué precachear.
-      - name: Construir
+      # `npm run build` arranca con `tsc -b`, así que esto también comprueba
+      # los tipos de toda la app.
+      - name: Compilar
         run: npm run build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/
-
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
 
   deploy:
-    needs: build
+    name: Publicar
+    needs: test
+    if: github.ref_name == github.event.repository.default_branch && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # `enablement: true` activa Pages por API si aún no lo está, de modo que
+      # el primer despliegue no exige pasar antes por los ajustes del repo.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # Pages sirve la app desde /<repo>/, no desde la raíz: el mismo valor lo
+      # usan Vite para las rutas de los assets y el service worker para saber
+      # qué precachear.
+      - name: Construir para Pages
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
       - id: deployment
         uses: actions/deploy-pages@v4

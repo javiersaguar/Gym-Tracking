@@ -122,5 +122,11 @@ detalle de interacción.
 
 ## Despliegue
 
-`.github/workflows/deploy.yml` publica en GitHub Pages con cada `push` a la rama por defecto. Hay que
-activarlo una vez en **Settings → Pages → Source → GitHub Actions**.
+`.github/workflows/deploy.yml` prueba y compila cada rama, y publica en GitHub Pages la **rama por
+defecto del repositorio** (la compara con `default_branch`, no con un nombre escrito a mano, para que
+el despliegue no deje de dispararse por llamarse la rama de otra forma).
+
+El propio workflow intenta activar Pages por API en el primer despliegue. Si GitHub lo rechaza, hay que
+activarlo a mano una vez en **Settings → Pages → Source → GitHub Actions**.
+
+La app queda en `https://<usuario>.github.io/<repo>/`.
