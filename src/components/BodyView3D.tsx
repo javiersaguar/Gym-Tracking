@@ -83,10 +83,13 @@ export type BodyView3DProps = {
   /** Detalle: colorea por cabeza, atenúa el resto y saca las capas profundas. */
   detail?: boolean;
   /**
-   * Pieza a la que girar la figura. Sirve para que tocar una fila de la lista
-   * ponga ese músculo de cara: la lista y la figura señalan lo mismo, y quien
-   * no pueda o no quiera arrastrar llega igual a cualquier músculo.
+   * Grupo o porción a la que girar la figura.
+   *
+   * Solo se pone cuando la orden viene de fuera del visor —una fila de la
+   * lista, o entrar al detalle de un grupo—, nunca al tocar el propio cuerpo:
+   * girar lo que el dedo acaba de señalar se siente como si la figura huyera.
    */
+  faceMuscle?: Muscle | null;
   faceHead?: string | null;
   onPick?: (pick: BodyPick | null) => void;
   /** Cartel que sigue al músculo tocado mientras se gira la figura. */
@@ -115,6 +118,7 @@ export function BodyView3D({
   colorOf,
   focus,
   detail = false,
+  faceMuscle,
   faceHead,
   onPick,
   tag: tagNode,
@@ -505,14 +509,14 @@ export function BodyView3D({
   }, [colorOf, focus, detail, faceHead]);
 
   useEffect(() => {
-    if (!focus && !faceHead) return;
+    if (!faceMuscle && !faceHead) return;
     const parts = body().parts.map((p) => p.part);
     const anchor = faceHead ? parts.find((p) => p.head === faceHead) : undefined;
     api.current?.spinTo(
-      bestYaw(parts, focus ?? null, faceHead),
+      bestYaw(parts, faceMuscle ?? null, faceHead),
       anchor?.muscle ? { point: anchor.anchor, muscle: anchor.muscle } : undefined,
     );
-  }, [focus, faceHead]);
+  }, [faceMuscle, faceHead]);
 
   return (
     <div className={className}>

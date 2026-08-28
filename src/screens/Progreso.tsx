@@ -166,6 +166,9 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
      así la lista y el cuerpo señalan siempre lo mismo: quien no quiera —o no
      pueda— arrastrar llega igual a cualquier músculo. */
   const [facing, setFacing] = useState<string | null>(null);
+  /* Grupo al que girar. Se pone al entrar en un detalle o al tocar el ranking;
+     nunca al tocar el cuerpo, que ya estaba de cara. */
+  const [facingMuscle, setFacingMuscle] = useState<Muscle | null>(null);
 
   const byMuscle = useMemo(
     () => new Map(states.map((s) => [s.muscle, s])),
@@ -210,6 +213,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
     setPicked(m);
     setTapped(null);
     setFacing(null);
+    setFacingMuscle(m);
   };
 
   const detailState = detail ? byMuscle.get(detail) : null;
@@ -262,6 +266,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                 colorOf={colorOf}
                 focus={detail ?? picked}
                 detail={!!detail}
+                faceMuscle={facingMuscle}
                 faceHead={detail ? facing : null}
                 onPick={(p) => {
                   if (p) haptic();
@@ -438,7 +443,9 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                 <button
                   onClick={() => {
                     haptic(8);
-                    setPicked(picked === s.muscle ? null : s.muscle);
+                    const next = picked === s.muscle ? null : s.muscle;
+                    setPicked(next);
+                    setFacingMuscle(next);
                     setTapped(null);
                   }}
                   className="flex w-full items-center gap-4 border-b border-line py-3 text-left transition-colors duration-press hover:bg-paper"
