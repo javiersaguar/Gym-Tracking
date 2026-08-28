@@ -68,17 +68,24 @@ describe('cobertura de los grupos', () => {
     }
   });
 
-  it('cada pieza tiene su reflejo con la misma forma', () => {
-    const bySide = new Map<string, Part[]>();
+  it('cada pieza o va emparejada con su reflejo o va sobre el eje', () => {
+    const bySpec = new Map<string, Part[]>();
     for (const p of parts) {
-      const key = p.head ?? p.id.split('#')[0] ?? '';
-      bySide.set(key, [...(bySide.get(key) ?? []), p]);
+      const key = p.id.split('#')[0] ?? '';
+      bySpec.set(key, [...(bySpec.get(key) ?? []), p]);
     }
-    for (const [key, list] of bySide) {
-      expect(list.length % 2, `${key}: pares`).toBe(0);
-      const left = list.filter((p) => p.center[0] > 0);
-      const right = list.filter((p) => p.center[0] < 0);
-      expect(left.length, `${key}: mismo número a cada lado`).toBe(right.length);
+    for (const [key, list] of bySpec) {
+      if (list.length === 1) {
+        /* Las piezas únicas son las de la línea media: la línea alba, el
+           esternón, el canal de la columna y el pliegue interglúteo. */
+        expect(Math.abs(list[0]?.center[0] ?? 99), `${key}: centrada en el eje`).toBeLessThan(0.5);
+        continue;
+      }
+      expect(list.length, `${key}: par`).toBe(2);
+      const [a, b] = list as [Part, Part];
+      expect(a.center[0], `${key}: lados opuestos`).toBeCloseTo(-b.center[0], 4);
+      expect(a.center[1], `${key}: misma altura`).toBeCloseTo(b.center[1], 4);
+      expect(a.positions.length, `${key}: misma malla`).toBe(b.positions.length);
     }
   });
 });

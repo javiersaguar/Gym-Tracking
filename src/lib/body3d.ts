@@ -351,8 +351,8 @@ const NECK_RINGS: number[][] = [
 ];
 
 const ARM_AXIS: Vec3[] = [
-  [16.2, 147, 0],
-  [19.4, 129, -0.5],
+  [14.6, 152, 0],
+  [19.2, 130, -0.5],
   [21.5, 112, -1],
   [23.0, 98, 0],
   [24.0, 86, 1],
@@ -362,10 +362,11 @@ const ARM_AXIS: Vec3[] = [
 /* [t, radio, achatamiento delante-detrás] — el hombro es lo más grueso, la
    muñeca lo más fino, y la mano se aplana para no ser un cono. */
 const ARM_RADII: number[][] = [
-  [0.0, 7.5, 1.0],
-  [0.06, 7.2, 1.0],
-  [0.16, 6.3, 1.0],
-  [0.28, 5.6, 1.0],
+  [0.0, 3.6, 1.0],
+  [0.05, 7.0, 1.0],
+  [0.12, 7.7, 1.0],
+  [0.2, 7.0, 1.0],
+  [0.29, 5.9, 1.0],
   [0.38, 4.9, 0.98],
   [0.44, 4.3, 0.92],
   [0.52, 4.9, 0.94],
@@ -414,9 +415,22 @@ type Spec = {
   muscle: Muscle | null;
   on: Surface;
   rows: Row[];
-  /** Cuánto se levanta sobre la piel. Por defecto, según la superficie. */
+  /**
+   * Cuánto se levanta sobre la piel. En negativo hunde, que es como se hacen
+   * los surcos: la línea alba, el canal de la columna o el hueco del codo no
+   * son músculos, son ausencias, y sin ellos el cuerpo parece un maniquí.
+   */
   amp?: number;
   deep?: boolean;
+  /** Pieza que va sobre el eje del cuerpo y no se refleja. */
+  single?: boolean;
+  /**
+   * Forma del relieve, de 0 a 1. Bajo aplana el parche como una lámina —el
+   * dorsal, el trapecio, el serrato— y alto lo redondea como un vientre —el
+   * bíceps, el gemelo, el deltoides—. Con un solo valor para todos, el cuerpo
+   * salía acolchado.
+   */
+  round?: number;
 };
 
 /* Los músculos profundos se separan de la piel más de lo que les tocaría: en
@@ -425,8 +439,9 @@ type Spec = {
 const DEEP_LIFT = 2.4;
 
 /* Perfil del abombado: lleno en el centro y a cero en los bordes, para que el
-   parche nazca de la piel y no se vea el escalón del recorte. */
-const bulge = (x: number) => Math.sin(Math.PI * clamp(x, 0, 1)) ** 0.55;
+   parche nazca de la piel y no se vea el escalón del recorte. El exponente
+   decide si el músculo es una lámina o un vientre. */
+const bulge = (x: number, round: number) => Math.sin(Math.PI * clamp(x, 0, 1)) ** (1.15 - round * 0.95);
 
 /**
  * Hendidura entre músculos.
@@ -436,15 +451,16 @@ const bulge = (x: number) => Math.sin(Math.PI * clamp(x, 0, 1)) ** 0.55;
  * los cuatro lados asoma la piel entre ellos como una línea fina, que es lo que
  * separa los músculos en las láminas de anatomía.
  */
-const INSET_DEG = 1.6;
-const INSET_U = 0.02;
+const INSET_DEG = 2.2;
+const INSET_U = 0.025;
 
-function buildPatch(s: Spec, side: 1 | -1, nu = 9, nv = 12): Part {
+function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part {
   const rows = s.rows;
   const span = at(rows, rows.length - 1)[0] - at(rows, 0)[0];
   const u0 = at(rows, 0)[0] + span * INSET_U;
   const u1 = at(rows, rows.length - 1)[0] - span * INSET_U;
   const amp = s.amp ?? 1.0;
+  const round = s.round ?? 0.5;
 
   let cx = 0;
   let cy = 0;
@@ -461,7 +477,7 @@ function buildPatch(s: Spec, side: 1 | -1, nu = 9, nv = 12): Part {
     const deg = a + (b - a) * fv;
     const p = s.on.at(u, deg);
     const n = normalAt(s.on, u, deg);
-    const h = (s.deep ? DEEP_LIFT : 0) + amp * bulge(fu) * bulge(fv);
+    const h = (s.deep ? DEEP_LIFT : 0) + amp * bulge(fu, round) * bulge(fv, round);
     const out = add(p, mul(n, h)) as Vec3;
     cx += out[0];
     cy += out[1];
@@ -474,7 +490,7 @@ function buildPatch(s: Spec, side: 1 | -1, nu = 9, nv = 12): Part {
   const data = side === 1 ? mesh : mirror(mesh);
   return {
     ...data,
-    id: `${s.head ?? 'piel'}#${side}`,
+    id: `${s.head ?? 'piel'}-${index}#${side}`,
     muscle: s.muscle,
     head: s.head,
     deep: s.deep ?? false,
@@ -483,82 +499,101 @@ function buildPatch(s: Spec, side: 1 | -1, nu = 9, nv = 12): Part {
 }
 
 const T = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Partial<Spec> = {}): Spec =>
-  ({ head, muscle, on: TORSO, rows, amp: 1.05, ...extra });
+  ({ head, muscle, on: TORSO, rows, amp: 1.63, ...extra });
 const A = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Partial<Spec> = {}): Spec =>
-  ({ head, muscle, on: ARM, rows, amp: 0.85, ...extra });
+  ({ head, muscle, on: ARM, rows, amp: 1.32, ...extra });
 const L = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Partial<Spec> = {}): Spec =>
-  ({ head, muscle, on: LEG, rows, amp: 1.0, ...extra });
+  ({ head, muscle, on: LEG, rows, amp: 1.55, ...extra });
 
 const SPECS: Spec[] = [
   /* ── Tronco, delante ───────────────────────────────────────────────────── */
   /* Pectoral en sus tres porciones: la clavicular se estrecha al subir hacia
      la clavícula y la abdominal se recoge hacia el esternón. */
-  T('pecho.clavicular', 'pecho', [[143, 4, 62], [146, 4, 60], [149, 5, 46]], { amp: 1.5 }),
-  T('pecho.esternal', 'pecho', [[133, 5, 58], [138, 4, 64], [143, 4, 62]], { amp: 1.8 }),
-  T('pecho.abdominal', 'pecho', [[126.5, 8, 42], [130, 6, 52], [133, 5, 58]], { amp: 1.45 }),
+  T('pecho.clavicular', 'pecho', [[143, 4, 62], [146, 4, 60], [149, 5, 46]], { round: 0.15, amp: 2.33 }),
+  T('pecho.esternal', 'pecho', [[133, 5, 58], [138, 4, 64], [143, 4, 62]], { round: 0.15, amp: 2.79 }),
+  T('pecho.abdominal', 'pecho', [[126.5, 8, 42], [130, 6, 52], [133, 5, 58]], { round: 0.15, amp: 2.25 }),
 
   /* Recto abdominal: la banda pegada a la línea alba. */
-  T('abdomen.recto', 'abdomen', [[102, 4, 20], [110, 3, 26], [118, 3, 27], [126, 3, 25]], { amp: 0.95 }),
+  T('abdomen.recto', 'abdomen', [[102, 4, 20], [110, 3, 26], [118, 3, 27], [126, 3, 25]], { round: 0.85, amp: 1.47 }),
   T('abdomen.oblicuo', 'abdomen', [[103, 26, 50], [110, 26, 64], [118, 27, 66], [126, 30, 62]]),
-  T('abdomen.serrato', 'abdomen', [[119, 64, 84], [125, 62, 88], [131, 64, 84]], { amp: 0.8 }),
-  T('abdomen.transverso', 'abdomen', [[104, 6, 54], [112, 5, 58], [119, 6, 54]], { amp: 0.5, deep: true }),
+  T('abdomen.serrato', 'abdomen', [[119, 64, 84], [125, 62, 88], [131, 64, 84]], { round: 0.15, amp: 1.24 }),
+  T('abdomen.transverso', 'abdomen', [[104, 6, 54], [112, 5, 58], [119, 6, 54]], { round: 0.15, amp: 0.78, deep: true }),
 
   /* ── Tronco, espalda ───────────────────────────────────────────────────── */
-  T('espalda.erectores', 'espalda', [[101, 165, 180], [110, 160, 180], [120, 160, 180], [128, 163, 180]], { amp: 0.9 }),
-  T('espalda.romboides', 'espalda', [[132, 150, 178], [139, 146, 178], [146, 150, 178]], { amp: 0.55, deep: true }),
+  T('espalda.erectores', 'espalda', [[101, 165, 180], [110, 160, 180], [120, 160, 180], [128, 163, 180]], { amp: 1.4 }),
+  T('espalda.romboides', 'espalda', [[132, 150, 178], [139, 146, 178], [146, 150, 178]], { round: 0.15, amp: 0.85, deep: true }),
   /* Dorsal: arriba es solo el pliegue de la axila y abajo llega a la columna.
      Estrechar los dos bordes daba un reloj de arena; el borde interno se queda
      pegado a la columna y solo se mueve el de fuera. */
   T('espalda.dorsal', 'espalda', [
     [111, 124, 179], [119, 104, 179], [128, 96, 178], [137, 94, 176], [146, 96, 122],
-  ], { amp: 1.15 }),
-  T('espalda.trapecio-inf', 'espalda', [[119, 166, 180], [126, 152, 180], [134, 140, 180]], { amp: 0.8 }),
-  T('espalda.trapecio-med', 'espalda', [[134, 140, 180], [141, 132, 180], [148, 142, 180]], { amp: 0.9 }),
+  ], { amp: 1.78 }),
+  T('espalda.trapecio-inf', 'espalda', [[119, 166, 180], [126, 152, 180], [133, 139, 180]], { round: 0.15, amp: 1.24 }),
+  T('espalda.trapecio-med', 'espalda', [[133, 139, 180], [139, 131, 180], [145, 145, 180]], { round: 0.15, amp: 1.4 }),
+  /* El superior y el medio se pisaban cerca de la columna y el solapamiento
+     hacía un galón brillante en la nuca; ahora comparten borde. */
   T('espalda.trapecio-sup', 'espalda', [
-    [144, 58, 140], [147, 62, 170], [151, 100, 180], [155, 148, 180],
-  ], { amp: 1.0 }),
-  T('espalda.redondo', 'espalda', [[134, 102, 122], [138, 96, 124], [142, 98, 118]], { amp: 0.85 }),
+    [142, 58, 142], [146, 60, 145], [151, 84, 180], [156, 124, 180],
+  ], { round: 0.15, amp: 1.55 }),
+  T('espalda.redondo', 'espalda', [[134, 102, 122], [138, 96, 124], [142, 98, 118]], { amp: 1.32 }),
 
   /* ── Glúteo ────────────────────────────────────────────────────────────── */
-  T('gluteo.menor', 'gluteo', [[100, 88, 124], [105, 86, 126], [110, 90, 122]], { amp: 0.5, deep: true }),
-  T('gluteo.medio', 'gluteo', [[100, 84, 130], [106, 78, 134], [112, 92, 128]], { amp: 0.9 }),
-  T('gluteo.mayor', 'gluteo', [[83, 116, 176], [90, 108, 180], [98, 112, 180], [104, 132, 180]], { amp: 1.3 }),
+  T('gluteo.menor', 'gluteo', [[100, 88, 124], [105, 86, 126], [110, 90, 122]], { round: 0.15, amp: 0.78, deep: true }),
+  T('gluteo.medio', 'gluteo', [[100, 84, 130], [106, 78, 134], [112, 92, 128]], { round: 0.85, amp: 1.4 }),
+  T('gluteo.mayor', 'gluteo', [[83, 116, 176], [90, 108, 180], [98, 112, 180], [104, 132, 180]], { round: 0.85, amp: 2.02 }),
 
   /* ── Hombro ────────────────────────────────────────────────────────────── */
-  A('hombro.anterior', 'hombro', [[0.0, -55, 22], [0.1, -55, 25], [0.2, -48, 20], [0.28, -30, 5]], { amp: 1.1 }),
-  A('hombro.lateral', 'hombro', [[0.0, 22, 112], [0.1, 25, 115], [0.2, 20, 108], [0.3, 5, 85]], { amp: 1.2 }),
-  A('hombro.posterior', 'hombro', [[0.0, 112, 196], [0.1, 115, 198], [0.2, 108, 190], [0.28, 85, 170]], { amp: 1.1 }),
+  A('hombro.anterior', 'hombro', [[0.03, -55, 22], [0.11, -55, 25], [0.2, -48, 20], [0.3, -30, 5]], { round: 0.85, amp: 1.71 }),
+  A('hombro.lateral', 'hombro', [[0.03, 22, 112], [0.11, 25, 115], [0.2, 20, 108], [0.32, 5, 85]], { round: 0.85, amp: 1.86 }),
+  A('hombro.posterior', 'hombro', [[0.03, 112, 196], [0.11, 115, 198], [0.2, 108, 190], [0.3, 85, 170]], { round: 0.85, amp: 1.71 }),
 
   /* ── Brazo ─────────────────────────────────────────────────────────────── */
-  A('biceps.larga', 'biceps', [[0.17, 8, 52], [0.26, 4, 56], [0.35, 2, 52], [0.43, 6, 42]], { amp: 1.1 }),
-  A('biceps.corta', 'biceps', [[0.17, -50, 8], [0.26, -56, 4], [0.35, -52, 2], [0.43, -42, 6]], { amp: 1.0 }),
-  A('biceps.braquial', 'biceps', [[0.3, 52, 78], [0.36, 50, 82], [0.42, 46, 80], [0.47, 44, 74]], { amp: 0.7 }),
-  A('triceps.larga', 'triceps', [[0.1, 130, 190], [0.2, 128, 196], [0.31, 126, 192], [0.4, 130, 182]], { amp: 1.1 }),
-  A('triceps.lateral', 'triceps', [[0.1, 82, 130], [0.2, 78, 128], [0.31, 80, 126], [0.4, 88, 130]], { amp: 1.0 }),
-  A('triceps.medial', 'triceps', [[0.36, 104, 136], [0.41, 100, 142], [0.47, 106, 138]], { amp: 0.7 }),
+  A('biceps.larga', 'biceps', [[0.17, 8, 52], [0.26, 4, 56], [0.35, 2, 52], [0.43, 6, 42]], { round: 0.85, amp: 1.71 }),
+  A('biceps.corta', 'biceps', [[0.17, -50, 8], [0.26, -56, 4], [0.35, -52, 2], [0.43, -42, 6]], { round: 0.85, amp: 1.55 }),
+  A('biceps.braquial', 'biceps', [[0.3, 52, 78], [0.36, 50, 82], [0.42, 46, 80], [0.47, 44, 74]], { amp: 1.08 }),
+  A('triceps.larga', 'triceps', [[0.1, 130, 190], [0.2, 128, 196], [0.31, 126, 192], [0.4, 130, 182]], { round: 0.85, amp: 1.71 }),
+  A('triceps.lateral', 'triceps', [[0.1, 82, 130], [0.2, 78, 128], [0.31, 80, 126], [0.4, 88, 130]], { round: 0.85, amp: 1.55 }),
+  A('triceps.medial', 'triceps', [[0.36, 104, 136], [0.41, 100, 142], [0.47, 106, 138]], { amp: 1.08 }),
   /* Antebrazo: la app no lo mide, pero un antebrazo liso canta a muñeco. */
-  A(null, null, [[0.47, 40, 150], [0.6, 36, 154], [0.72, 44, 146]], { amp: 0.65 }),
-  A(null, null, [[0.47, -140, 40], [0.6, -144, 36], [0.72, -136, 44]], { amp: 0.65 }),
+  A(null, null, [[0.47, 40, 150], [0.6, 36, 154], [0.72, 44, 146]], { amp: 1.01 }),
+  A(null, null, [[0.47, -140, 40], [0.6, -144, 36], [0.72, -136, 44]], { amp: 1.01 }),
 
   /* ── Muslo ─────────────────────────────────────────────────────────────── */
-  L('cuadriceps.vasto-intermedio', 'cuadriceps', [[0.06, -22, 22], [0.24, -20, 20], [0.42, -18, 18]], { amp: 0.5, deep: true }),
-  L('cuadriceps.recto', 'cuadriceps', [[0.02, -26, 26], [0.16, -24, 26], [0.32, -22, 24], [0.44, -20, 20]], { amp: 1.05 }),
-  L('cuadriceps.vasto-lateral', 'cuadriceps', [[0.02, 26, 76], [0.14, 24, 82], [0.3, 22, 80], [0.44, 20, 62]], { amp: 1.15 }),
-  L('cuadriceps.vasto-medial', 'cuadriceps', [[0.2, -60, -24], [0.32, -66, -22], [0.4, -70, -20], [0.47, -58, -18]], { amp: 1.1 }),
-  L('aductor.largo', 'aductor', [[0.0, -85, -60], [0.1, -88, -58], [0.24, -86, -62]], { amp: 0.9 }),
-  L('aductor.gracil', 'aductor', [[0.03, -106, -86], [0.24, -108, -88], [0.45, -104, -86]], { amp: 0.7 }),
-  L('aductor.mayor', 'aductor', [[0.0, -150, -106], [0.12, -152, -108], [0.28, -148, -106]], { amp: 0.95 }),
+  L('cuadriceps.vasto-intermedio', 'cuadriceps', [[0.06, -22, 22], [0.24, -20, 20], [0.42, -18, 18]], { round: 0.15, amp: 0.78, deep: true }),
+  L('cuadriceps.recto', 'cuadriceps', [[0.02, -26, 26], [0.16, -24, 26], [0.32, -22, 24], [0.44, -20, 20]], { round: 0.85, amp: 1.63 }),
+  L('cuadriceps.vasto-lateral', 'cuadriceps', [[0.02, 26, 76], [0.14, 24, 82], [0.3, 22, 80], [0.44, 20, 62]], { round: 0.85, amp: 1.78 }),
+  L('cuadriceps.vasto-medial', 'cuadriceps', [[0.2, -60, -24], [0.32, -66, -22], [0.4, -70, -20], [0.47, -58, -18]], { round: 0.85, amp: 1.71 }),
+  L('aductor.largo', 'aductor', [[0.0, -85, -60], [0.1, -88, -58], [0.24, -86, -62]], { amp: 1.4 }),
+  L('aductor.gracil', 'aductor', [[0.03, -106, -86], [0.24, -108, -88], [0.45, -104, -86]], { amp: 1.08 }),
+  L('aductor.mayor', 'aductor', [[0.0, -150, -106], [0.12, -152, -108], [0.28, -148, -106]], { amp: 1.47 }),
 
   /* ── Isquiotibiales ────────────────────────────────────────────────────── */
-  L('femoral.biceps', 'femoral', [[0.06, 100, 150], [0.2, 96, 152], [0.34, 98, 150], [0.45, 104, 146]], { amp: 1.1 }),
-  L('femoral.semitendinoso', 'femoral', [[0.06, 152, 200], [0.2, 154, 205], [0.34, 152, 202], [0.45, 150, 196]], { amp: 1.0 }),
-  L('femoral.semimembranoso', 'femoral', [[0.16, 200, 224], [0.3, 202, 228], [0.46, 198, 220]], { amp: 0.8 }),
+  L('femoral.biceps', 'femoral', [[0.06, 100, 150], [0.2, 96, 152], [0.34, 98, 150], [0.45, 104, 146]], { round: 0.85, amp: 1.71 }),
+  L('femoral.semitendinoso', 'femoral', [[0.06, 152, 200], [0.2, 154, 205], [0.34, 152, 202], [0.45, 150, 196]], { round: 0.85, amp: 1.55 }),
+  L('femoral.semimembranoso', 'femoral', [[0.16, 200, 224], [0.3, 202, 228], [0.46, 198, 220]], { amp: 1.24 }),
 
   /* ── Pierna ────────────────────────────────────────────────────────────── */
-  L('gemelo.gastro-lateral', 'gemelo', [[0.52, 108, 178], [0.6, 100, 178], [0.7, 104, 178], [0.79, 116, 176]], { amp: 1.1 }),
-  L('gemelo.gastro-medial', 'gemelo', [[0.52, 182, 252], [0.6, 182, 260], [0.7, 182, 256], [0.8, 184, 244]], { amp: 1.2 }),
-  L('gemelo.soleo', 'gemelo', [[0.78, 96, 264], [0.87, 108, 252], [0.95, 122, 238]], { amp: 0.75 }),
-  L(null, null, [[0.52, -60, 10], [0.66, -56, 6], [0.82, -50, 0]], { amp: 0.6 }),
+  L('gemelo.gastro-lateral', 'gemelo', [[0.52, 108, 178], [0.6, 100, 178], [0.7, 104, 178], [0.79, 116, 176]], { round: 0.85, amp: 1.71 }),
+  L('gemelo.gastro-medial', 'gemelo', [[0.52, 182, 252], [0.6, 182, 260], [0.7, 182, 256], [0.8, 184, 244]], { round: 0.85, amp: 1.86 }),
+  L('gemelo.soleo', 'gemelo', [[0.78, 96, 264], [0.87, 108, 252], [0.95, 122, 238]], { amp: 1.16 }),
+  L(null, null, [[0.52, -60, 10], [0.66, -56, 6], [0.82, -50, 0]], { amp: 0.93 }),
+
+  /* ── Accidentes de la piel ─────────────────────────────────────────────── */
+  /* Ni músculo ni relleno: los surcos y los huesos que el ojo espera ver. Van
+     en negativo —hunden en vez de levantar— salvo la clavícula y la rótula,
+     que sobresalen. Sin ellos la figura es correcta y parece un maniquí. */
+  T(null, null, [[102, -2.6, 2.6], [116, -2.2, 2.2], [127, -2, 2]], { amp: -1.35, single: true }),
+  T(null, null, [[119, -3, 3], [132, -2.6, 2.6], [145, -3.4, 3.4]], { amp: -0.77, single: true }),
+  T(null, null, [[100, 177.5, 182.5], [124, 177, 183], [150, 177.5, 182.5]], { amp: -1.9, single: true }),
+  T(null, null, [[83, 177, 183], [92, 176, 184], [103, 177, 183]], { amp: -2.6, single: true }),
+  /* Clavícula: el hueso que remata el pecho por arriba. */
+  T(null, null, [[149, 8, 30], [151, 10, 44], [152.5, 16, 52]], { amp: 0.78 }),
+  /* Cresta ilíaca y hueco del ombligo. */
+  T(null, null, [[106, 30, 62], [110, 34, 66], [113, 42, 68]], { amp: -0.77 }),
+  T(null, null, [[118, -3, 3], [120, -4, 4], [122, -3, 3]], { amp: -1.19, single: true }),
+  /* Rótula y hueco del codo. */
+  L(null, null, [[0.53, -26, 26], [0.57, -30, 30], [0.62, -24, 24]], { amp: 0.7 }),
+  A(null, null, [[0.44, 158, 202], [0.48, 152, 208], [0.53, 158, 202]], { amp: -0.94 }),
 ];
 
 /* ── Piel ────────────────────────────────────────────────────────────────── */
@@ -614,7 +649,7 @@ export function buildSkin(): MeshData {
 
 /** Todas las piezas musculares, los dos lados. */
 export function buildParts(): Part[] {
-  return SPECS.flatMap((s) => [buildPatch(s, 1), buildPatch(s, -1)]);
+  return SPECS.flatMap((s, i) => (s.single ? [buildPatch(s, i, 1)] : [buildPatch(s, i, 1), buildPatch(s, i, -1)]));
 }
 
 /**

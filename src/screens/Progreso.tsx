@@ -287,7 +287,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
             </Suspense>
           </div>
           <p className="border-t border-line-soft py-2.5 text-center text-micro text-ink-faint">
-            Arrastra para girar · pellizca para acercar · toca un músculo
+            Arrastra para girar · pellizca para acercar · toca un músculo · doble toque para centrar
           </p>
         </Card>
 
