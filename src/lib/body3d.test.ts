@@ -103,6 +103,22 @@ describe('encuadre automático', () => {
     }
   });
 
+  it('cada cabeza tiene su propio ángulo, no el del grupo', () => {
+    /* El deltoides es el caso que importa: sus tres porciones están una
+       delante, otra al lado y otra detrás, y girar al «ángulo del hombro»
+       dejaría la posterior escondida justo al entrar a mirarla. */
+    const anterior = bestYaw(parts, null, 'hombro.anterior');
+    const posterior = bestYaw(parts, null, 'hombro.posterior');
+    expect(Math.abs(anterior), 'anterior de frente').toBeLessThan(0.6);
+    expect(Math.abs(posterior), 'posterior por detrás').toBeGreaterThan(Math.PI - 0.6);
+  });
+
+  it('mirar una cabeza del pecho sigue mirando de frente', () => {
+    for (const h of ['pecho.clavicular', 'pecho.esternal', 'pecho.abdominal']) {
+      expect(Math.abs(bestYaw(parts, null, h)), h).toBeLessThan(0.3);
+    }
+  });
+
   it('el giro propuesto siempre es un ángulo válido', () => {
     for (const m of MUSCLES) {
       const y = bestYaw(parts, m);

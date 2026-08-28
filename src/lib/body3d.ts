@@ -701,8 +701,8 @@ export function buildParts(): Part[] {
  * que es lo que interesa. Promediar un solo lado dejaba el pecho girado
  * cuarenta grados.
  */
-export function bestYaw(parts: Part[], muscle: Muscle): number {
-  const mine = parts.filter((p) => p.muscle === muscle);
+export function bestYaw(parts: Part[], muscle: Muscle | null, head?: string | null): number {
+  const mine = parts.filter((p) => (head ? p.head === head : p.muscle === muscle));
   if (!mine.length) return 0;
   let sx = 0;
   let sz = 0;

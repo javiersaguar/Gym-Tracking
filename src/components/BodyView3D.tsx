@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { BODY_HEIGHT, bestYaw, buildParts, buildSkin, type Part } from '../lib/body3d';
+import { BODY_HEIGHT, bestYaw, buildParts, buildSkin, type Part, type Vec3 } from '../lib/body3d';
 import type { Muscle } from '../lib/types';
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -77,6 +77,12 @@ export type BodyView3DProps = {
   focus?: Muscle | null;
   /** Detalle: colorea por cabeza, atenúa el resto y saca las capas profundas. */
   detail?: boolean;
+  /**
+   * Pieza a la que girar la figura. Sirve para que tocar una fila de la lista
+   * ponga ese músculo de cara: la lista y la figura señalan lo mismo, y quien
+   * no pueda o no quiera arrastrar llega igual a cualquier músculo.
+   */
+  faceHead?: string | null;
   onPick?: (pick: BodyPick | null) => void;
   /** Cartel que sigue al músculo tocado mientras se gira la figura. */
   tag?: React.ReactNode;
@@ -99,14 +105,28 @@ const UNMEASURED = '#D8D8D1';
 const FAR = 430;
 const NEAR = 130;
 
-export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNode, className, label }: BodyView3DProps) {
+export function BodyView3D({
+  colorOf,
+  focus,
+  detail = false,
+  faceHead,
+  onPick,
+  tag: tagNode,
+  className,
+  label,
+}: BodyView3DProps) {
   const host = useRef<HTMLDivElement>(null);
   const tag = useRef<HTMLDivElement>(null);
+  /* Un móvil viejo puede no dar WebGL, y cualquiera puede perder el contexto
+     al dejar la app en segundo plano un rato. En los dos casos hace falta
+     decirlo: un hueco en blanco de cuatrocientos píxeles parece una app rota,
+     y además toda esta información está también en la lista de abajo. */
+  const [broken, setBroken] = useState<'no-webgl' | 'perdido' | null>(null);
   /* Todo lo que cambia por fotograma vive en refs: si pasara por el estado de
      React, cada grado de giro sería un render del árbol entero. */
   const api = useRef<{
     setColors: (fn: BodyView3DProps['colorOf'], focus: Muscle | null, detail: boolean) => void;
-    spinTo: (yaw: number) => void;
+    spinTo: (yaw: number, anchor?: { point: Vec3; muscle: Muscle }) => void;
     clearPick: () => void;
   } | null>(null);
   const pick = useRef(onPick);
@@ -120,7 +140,7 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
     } catch {
-      el.dataset.failed = 'true';
+      setBroken('no-webgl');
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -251,8 +271,18 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
       const behind = facing.z < -2 && Math.abs(facing.x) < 12;
       node.style.opacity = v.z > 1 || behind ? '0' : '1';
       const rect = renderer.domElement.getBoundingClientRect();
-      node.style.left = `${((v.x + 1) / 2) * rect.width}px`;
-      node.style.top = `${((1 - v.y) / 2) * rect.height}px`;
+      const x = ((v.x + 1) / 2) * rect.width;
+      const y = ((1 - v.y) / 2) * rect.height;
+      /* El cartel va encima del músculo, salvo cuando el músculo está tan
+         arriba que el cartel se saldría del visor: entonces baja. Y se frena
+         en los lados para no cortarse contra el borde de la tarjeta. */
+      const below = y < node.offsetHeight + 16;
+      node.style.transform = below
+        ? 'translate(-50%, 12px)'
+        : 'translate(-50%, calc(-100% - 12px))';
+      const half = node.offsetWidth / 2 + 6;
+      node.style.left = `${Math.min(rect.width - half, Math.max(half, x))}px`;
+      node.style.top = `${y}px`;
     };
 
     const resize = () => {
@@ -377,6 +407,19 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
       });
     };
 
+    /* Al recuperar el contexto three.js vuelve a subir la geometría solo; lo
+       único que hay que hacer es pedir un fotograma y quitar el aviso. */
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      setBroken('perdido');
+    };
+    const onRestored = () => {
+      setBroken(null);
+      wake();
+    };
+    canvas.addEventListener('webglcontextlost', onLost);
+    canvas.addEventListener('webglcontextrestored', onRestored);
+
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerup', onUp);
@@ -399,9 +442,13 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
         fade = 0;
         wake();
       },
-      spinTo(next) {
+      spinTo(next, anchor) {
         yawTarget = next;
         spin = 0;
+        /* Al girar desde la lista, el cartel se clava en el centro de la
+           pieza: si no, la figura se movía y el nombre se quedaba sin decir
+           a qué músculo señala. */
+        picked = anchor ? { point: new THREE.Vector3(...anchor.point), muscle: anchor.muscle } : picked;
         wake();
       },
       clearPick() {
@@ -414,6 +461,8 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
       alive = false;
       if (frame) cancelAnimationFrame(frame);
       ro.disconnect();
+      canvas.removeEventListener('webglcontextlost', onLost);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
@@ -430,8 +479,16 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
   }, [colorOf, focus, detail]);
 
   useEffect(() => {
-    if (detail && focus) api.current?.spinTo(bestYaw(body().parts.map((p) => p.part), focus));
-  }, [detail, focus]);
+    if (!focus && !faceHead) return;
+    const parts = body().parts.map((p) => p.part);
+    const anchor = faceHead
+      ? parts.find((p) => p.head === faceHead && p.center[0] >= 0)
+      : undefined;
+    api.current?.spinTo(
+      bestYaw(parts, focus ?? null, faceHead),
+      anchor?.muscle ? { point: anchor.center, muscle: anchor.muscle } : undefined,
+    );
+  }, [focus, faceHead]);
 
   return (
     <div className={className}>
@@ -441,9 +498,18 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
         role="img"
         aria-label={label}
       >
+        {broken && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper px-8">
+            <p className="max-w-[22rem] text-center text-caption text-ink-muted">
+              {broken === 'no-webgl'
+                ? 'Este navegador no puede dibujar la figura en tres dimensiones. Los mismos datos están en la lista de abajo, músculo por músculo.'
+                : 'La figura se ha quedado sin dibujar al volver a la app. Recarga la pantalla para recuperarla; mientras tanto, la lista de abajo tiene los mismos datos.'}
+            </p>
+          </div>
+        )}
         <div
           ref={tag}
-          className="absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+12px)] opacity-0 transition-opacity duration-200"
+          className="absolute z-10 opacity-0 transition-opacity duration-200"
         >
           {tagNode}
         </div>

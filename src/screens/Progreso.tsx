@@ -162,6 +162,10 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
   const [picked, setPicked] = useState<Muscle | null>(null);
   const [detail, setDetail] = useState<Muscle | null>(null);
   const [tapped, setTapped] = useState<BodyPick | null>(null);
+  /* Cabeza a la que mira la figura. Se pone al tocar una fila de la lista, y
+     así la lista y el cuerpo señalan siempre lo mismo: quien no quiera —o no
+     pueda— arrastrar llega igual a cualquier músculo. */
+  const [facing, setFacing] = useState<string | null>(null);
 
   const byMuscle = useMemo(
     () => new Map(states.map((s) => [s.muscle, s])),
@@ -205,6 +209,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
     setDetail(m);
     setPicked(m);
     setTapped(null);
+    setFacing(null);
   };
 
   const detailState = detail ? byMuscle.get(detail) : null;
@@ -220,6 +225,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                 onClick={() => {
                   setDetail(null);
                   setTapped(null);
+                  setFacing(null);
                 }}
                 className="text-caption text-accent transition-colors duration-press hover:text-ink"
               >
@@ -256,6 +262,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                 colorOf={colorOf}
                 focus={detail ?? picked}
                 detail={!!detail}
+                faceHead={detail ? facing : null}
                 onPick={(p) => {
                   if (p) haptic();
                   setTapped(p);
@@ -287,7 +294,8 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
             </Suspense>
           </div>
           <p className="border-t border-line-soft py-2.5 text-center text-micro text-ink-faint">
-            Arrastra para girar · pellizca para acercar · toca un músculo · doble toque para centrar
+            Arrastra para girar · pellizca para acercar · toca un músculo ·
+            doble toque para centrar
           </p>
         </Card>
 
@@ -306,41 +314,53 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
             <SectionTitle>Reparto dentro del grupo</SectionTitle>
             <ul className="border-t border-line">
               {heads.map((h) => (
-                <li
-                  key={h.id}
-                  className="flex items-center gap-4 border-b border-line py-3"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-body text-ink">
-                      {HEAD_BY_ID[h.id]?.label ?? h.id}
-                      {/* En el cuerpo va tapada por otro músculo: el mapa la
+                <li key={h.id}>
+                  <button
+                    onClick={() => {
+                      haptic(8);
+                      setFacing(h.id);
+                      setTapped({ muscle: h.muscle, head: h.id, x: 0, y: 0 });
+                    }}
+                    aria-pressed={facing === h.id}
+                    className={cx(
+                      "flex w-full items-center gap-4 border-b border-line py-3 text-left transition-colors duration-press hover:bg-paper",
+                      facing === h.id && "bg-paper",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-body text-ink">
+                        {HEAD_BY_ID[h.id]?.label ?? h.id}
+                        {/* En el cuerpo va tapada por otro músculo: el mapa la
                           levanta para poder enseñarla, y conviene decirlo. */}
-                      {HEAD_BY_ID[h.id]?.deep && (
-                        <span className="ml-2 align-middle text-micro text-ink-faint">capa profunda</span>
-                      )}
+                        {HEAD_BY_ID[h.id]?.deep && (
+                          <span className="ml-2 align-middle text-micro text-ink-faint">
+                            capa profunda
+                          </span>
+                        )}
+                      </span>
+                      <span className="tnum block text-micro text-ink-faint">
+                        {h.sets > 0
+                          ? `${h.setsPerWeek.toFixed(1)} series/sem · ${tonnage(h.tonnage)}`
+                          : "sin trabajo en este periodo"}
+                      </span>
                     </span>
-                    <span className="tnum block text-micro text-ink-faint">
-                      {h.sets > 0
-                        ? `${h.setsPerWeek.toFixed(1)} series/sem · ${tonnage(h.tonnage)}`
-                        : "sin trabajo en este periodo"}
+                    <span className="tnum w-9 shrink-0 text-right text-caption font-medium text-ink">
+                      {h.score ?? "—"}
                     </span>
-                  </span>
-                  <span className="tnum w-9 shrink-0 text-right text-caption font-medium text-ink">
-                    {h.score ?? "—"}
-                  </span>
-                  <span className="h-[6px] w-16 shrink-0 overflow-hidden rounded-[3px] bg-line-soft">
-                    <span
-                      className="block h-full rounded-[3px]"
-                      style={{
-                        width: `${h.score ?? 0}%`,
-                        background:
-                          h.score == null
-                            ? "transparent"
-                            : thermal(h.score / 100),
-                        transition: "width 420ms cubic-bezier(.16,1,.3,1)",
-                      }}
-                    />
-                  </span>
+                    <span className="h-[6px] w-16 shrink-0 overflow-hidden rounded-[3px] bg-line-soft">
+                      <span
+                        className="block h-full rounded-[3px]"
+                        style={{
+                          width: `${h.score ?? 0}%`,
+                          background:
+                            h.score == null
+                              ? "transparent"
+                              : thermal(h.score / 100),
+                          transition: "width 420ms cubic-bezier(.16,1,.3,1)",
+                        }}
+                      />
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -416,9 +436,11 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
             {states.map((s) => (
               <li key={s.muscle}>
                 <button
-                  onClick={() =>
-                    setPicked(picked === s.muscle ? null : s.muscle)
-                  }
+                  onClick={() => {
+                    haptic(8);
+                    setPicked(picked === s.muscle ? null : s.muscle);
+                    setTapped(null);
+                  }}
                   className="flex w-full items-center gap-4 border-b border-line py-3 text-left transition-colors duration-press hover:bg-paper"
                 >
                   <span className="min-w-0 flex-1">
