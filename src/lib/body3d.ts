@@ -352,9 +352,12 @@ const TORSO_RINGS: number[][] = [
   [134, 15.3, 10.2, 10.8],
   [140, 15.9, 10.4, 11.0],
   [145, 16.6, 10.1, 10.8],
+  /* El tronco se afila por arriba hasta meterse dentro del cuello: si acaba
+     más ancho que él, su borde superior asoma como un cuello de camisa. */
   [149, 16.0, 9.2, 10.0],
-  [153, 12.4, 7.6, 8.6],
-  [156, 8.8, 6.2, 7.2],
+  [152, 12.6, 8.0, 8.8],
+  [155, 8.0, 5.6, 6.2],
+  [156.5, 5.0, 4.0, 4.4],
 ];
 
 /* La cabeza es otro perfil de secciones: así tiene mandíbula y occipucio en
@@ -371,10 +374,11 @@ const HEAD_RINGS: number[][] = [
 ];
 
 const NECK_RINGS: number[][] = [
-  [144, 7.2, 6.6, 7.0],
-  [150, 5.7, 5.4, 5.8],
-  [156, 5.6, 5.6, 6.0],
-  [160, 6.6, 6.6, 7.0],
+  [143, 9.6, 8.8, 9.4],
+  [148, 7.0, 6.6, 7.0],
+  [152, 6.0, 5.8, 6.2],
+  [156, 5.9, 5.9, 6.3],
+  [160, 6.8, 6.8, 7.2],
 ];
 
 const ARM_AXIS: Vec3[] = [
@@ -401,8 +405,8 @@ const ARM_RADII: number[][] = [
   [0.7, 4.1, 0.82],
   [0.79, 2.9, 0.7],
   [0.86, 3.8, 0.5],
-  [0.95, 3.4, 0.45],
-  [1.0, 1.0, 0.5],
+  [0.94, 3.5, 0.45],
+  [1.0, 2.1, 0.5],
 ];
 
 const LEG_AXIS: Vec3[] = [
@@ -555,6 +559,8 @@ const A = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Parti
   ({ head, muscle, on: ARM, rows, amp: 1.32, ...extra });
 const L = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Partial<Spec> = {}): Spec =>
   ({ head, muscle, on: LEG, rows, amp: 1.55, ...extra });
+const N = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Partial<Spec> = {}): Spec =>
+  ({ head, muscle, on: NECK, rows, amp: 0.8, ...extra });
 
 const SPECS: Spec[] = [
   /* ── Tronco, delante ───────────────────────────────────────────────────── */
@@ -584,6 +590,11 @@ const SPECS: Spec[] = [
   T('abdomen.serrato', 'abdomen', [[119, 64, 84], [125, 62, 88], [131, 64, 84]], { round: 0.15, amp: 1.24 }),
   T('abdomen.transverso', 'abdomen', [[107, 14, 42], [113, 12, 46], [118, 15, 41]], { round: 0.15, amp: 0.78, deep: true }),
 
+  /* Esternocleidomastoideo: los dos cordones que bajan de detrás de la oreja
+     al esternón. No se miden, pero sin ellos el cuello es un tubo y la unión
+     con la cabeza —que está arriba del todo y se mira siempre— canta. */
+  N(null, null, [[152, 5, 21], [156, 13, 31], [159.4, 24, 42]], { amp: 1.15, round: 0.85 }),
+
   /* ── Tronco, espalda ───────────────────────────────────────────────────── */
   T('espalda.erectores', 'espalda', [[100, 164, 180], [110, 161, 180], [122, 167, 180]], { amp: 1.4 }),
   T('espalda.romboides', 'espalda', [[134, 151, 173], [137, 148, 176], [140, 152, 173]], { round: 0.15, amp: 0.85, deep: true }),
@@ -600,7 +611,7 @@ const SPECS: Spec[] = [
   /* El superior y el medio se pisaban cerca de la columna y el solapamiento
      hacía un galón brillante en la nuca; ahora comparten borde. */
   T('espalda.trapecio-sup', 'espalda', [
-    [142, 149, 180], [147, 122, 180], [151, 86, 180], [156, 62, 180],
+    [142, 149, 180], [146, 122, 180], [150, 86, 180], [153, 70, 180], [155.4, 104, 180],
   ], { round: 0.15, amp: 1.55 }),
   T('espalda.redondo', 'espalda', [[140, 100, 126], [144, 96, 130], [148, 101, 124]], { amp: 1.32 }),
 
@@ -621,9 +632,21 @@ const SPECS: Spec[] = [
   A('triceps.larga', 'triceps', [[0.1, 130, 190], [0.2, 128, 196], [0.31, 126, 192], [0.4, 130, 182]], { round: 0.85, amp: 1.71 }),
   A('triceps.lateral', 'triceps', [[0.1, 82, 130], [0.2, 78, 128], [0.31, 80, 126], [0.4, 88, 130]], { round: 0.85, amp: 1.55 }),
   A('triceps.medial', 'triceps', [[0.36, 104, 136], [0.41, 100, 142], [0.47, 106, 138]], { amp: 1.08 }),
-  /* Antebrazo: la app no lo mide, pero un antebrazo liso canta a muñeco. */
-  A(null, null, [[0.47, 40, 150], [0.6, 36, 154], [0.72, 44, 146]], { amp: 1.01 }),
-  A(null, null, [[0.47, -140, 40], [0.6, -144, 36], [0.72, -136, 44]], { amp: 1.01 }),
+  /* Antebrazo: la app no lo mide, pero un antebrazo liso canta a muñeco. Son
+     tres masas —extensora por fuera, flexora por dentro y el braquiorradial
+     haciendo cresta desde el codo— y las tres se afilan hacia la muñeca, que
+     es de donde sale la forma del antebrazo. */
+  A(null, null, [[0.47, 44, 148], [0.58, 40, 152], [0.68, 46, 146], [0.78, 58, 132]], { amp: 1.05, round: 0.7 }),
+  A(null, null, [[0.47, -138, 42], [0.58, -142, 38], [0.68, -134, 44], [0.78, -120, 56]], { amp: 1.05, round: 0.7 }),
+  A(null, null, [[0.45, 36, 76], [0.54, 32, 74], [0.64, 36, 70], [0.74, 44, 66]], { amp: 0.75, round: 0.85 }),
+
+  /* Mano: el pulgar por dentro y dos hendiduras que insinúan los dedos. A
+     tamaño de pantalla son cuatro píxeles, pero al ampliar sobre el brazo la
+     diferencia entre una mano y una paleta se nota. */
+  A(null, null, [[0.84, -128, -58], [0.89, -132, -54], [0.94, -124, -62]], { amp: 1.1, round: 0.9 }),
+  A(null, null, [[0.9, -46, -36], [0.96, -48, -38], [1.0, -46, -36]], { amp: 0.1, groove: true }),
+  A(null, null, [[0.9, -5, 5], [0.96, -6, 6], [1.0, -5, 5]], { amp: 0.1, groove: true }),
+  A(null, null, [[0.9, 36, 46], [0.96, 38, 48], [1.0, 36, 46]], { amp: 0.1, groove: true }),
 
   /* ── Muslo ─────────────────────────────────────────────────────────────── */
   L('cuadriceps.vasto-intermedio', 'cuadriceps', [[0.13, -12, 12], [0.25, -14, 14], [0.37, -12, 12]], { round: 0.15, amp: 0.78, deep: true }),
@@ -703,8 +726,8 @@ function foot(): MeshData {
 
 export function buildSkin(): MeshData {
   return merge([
-    tube(TORSO, 74.5, 155.5, 36),
-    tube(NECK, 144.5, 159.5, 8, 22),
+    tube(TORSO, 74.5, 156.2, 36),
+    tube(NECK, 143.5, 159.8, 10, 24),
     tube(HEAD, 156.5, 180.4, 20, 26),
     tube(ARM, 0.02, 1, 44),
     mirror(tube(ARM, 0.02, 1, 44)),
