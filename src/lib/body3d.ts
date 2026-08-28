@@ -424,12 +424,19 @@ type Spec = {
   muscle: Muscle | null;
   on: Surface;
   rows: Row[];
-  /**
-   * Cuánto se levanta sobre la piel. En negativo hunde, que es como se hacen
-   * los surcos: la línea alba, el canal de la columna o el hueco del codo no
-   * son músculos, son ausencias, y sin ellos el cuerpo parece un maniquí.
-   */
+  /** Cuánto se levanta sobre la piel. */
   amp?: number;
+  /**
+   * Pliegue en vez de músculo: la línea alba, el canal de la columna, el
+   * ombligo, el hueco del codo.
+   *
+   * Se apoyan sobre la piel casi sin relieve y van oscuros hacia el centro, al
+   * revés que un músculo. Hundirlos de verdad no servía: un parche metido
+   * hacia dentro queda por detrás de la propia piel y no se ve nada. Lo que se
+   * veía era la junta clara entre los dos lados del cuerpo, que es justo lo
+   * contrario de una sombra.
+   */
+  groove?: boolean;
   deep?: boolean;
   /** Pieza que va sobre el eje del cuerpo y no se refleja. */
   single?: boolean;
@@ -488,7 +495,7 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
     const u = u0 + (u1 - u0) * fu;
     const a0 = track(rows, u, 1);
     const b0 = track(rows, u, 2);
-    const gap = Math.min(INSET_DEG, Math.abs(b0 - a0) * 0.18);
+    const gap = s.groove ? 0 : Math.min(INSET_DEG, Math.abs(b0 - a0) * 0.18);
     const a = a0 + gap;
     const b = b0 - gap;
     const fv = j / nv;
@@ -498,7 +505,9 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
     const h = (s.deep ? DEEP_LIFT : 0) + amp * bulge(fu, round) * bulge(fv, round);
     const out = add(p, mul(n, h)) as Vec3;
     const edge = Math.min(Math.min(fu, 1 - fu), Math.min(fv, 1 - fv)) * 2;
-    shade[i * (nv + 1) + j] = 0.82 + 0.18 * smoothstep(0, 0.26, edge);
+    shade[i * (nv + 1) + j] = s.groove
+      ? 1 - 0.34 * smoothstep(0, 0.55, edge)
+      : 0.82 + 0.18 * smoothstep(0, 0.26, edge);
     cx += out[0];
     cy += out[1];
     cz += out[2];
@@ -530,8 +539,8 @@ const SPECS: Spec[] = [
   /* ── Tronco, delante ───────────────────────────────────────────────────── */
   /* Pectoral en sus tres porciones: la clavicular se estrecha al subir hacia
      la clavícula y la abdominal se recoge hacia el esternón. */
-  T('pecho.clavicular', 'pecho', [[143, 4, 62], [146, 4, 60], [149, 5, 46]], { round: 0.15, amp: 2.33 }),
-  T('pecho.esternal', 'pecho', [[133, 5, 58], [138, 4, 64], [143, 4, 62]], { round: 0.15, amp: 2.79 }),
+  T('pecho.clavicular', 'pecho', [[143, 4, 64], [146.5, 4, 63], [150, 6, 50]], { round: 0.15, amp: 2.33 }),
+  T('pecho.esternal', 'pecho', [[133, 5, 58], [138, 4, 66], [143, 4, 64]], { round: 0.15, amp: 2.79 }),
   T('pecho.abdominal', 'pecho', [[126.5, 8, 42], [130, 6, 52], [133, 5, 58]], { round: 0.15, amp: 2.25 }),
 
   /* Recto abdominal: la banda pegada a la línea alba. */
@@ -542,7 +551,7 @@ const SPECS: Spec[] = [
   T('abdomen.recto', 'abdomen', [[108.8, 4, 30], [112, 3, 32], [114.6, 3, 31]], { round: 0.85, amp: 1.45 }),
   T('abdomen.recto', 'abdomen', [[115.8, 3, 31], [119, 3, 33], [121.4, 3, 32]], { round: 0.85, amp: 1.5 }),
   T('abdomen.recto', 'abdomen', [[122.6, 3, 32], [125, 3, 32], [127.4, 4, 29]], { round: 0.85, amp: 1.4 }),
-  T('abdomen.oblicuo', 'abdomen', [[103, 32, 52], [110, 33, 66], [118, 35, 68], [126, 36, 64]]),
+  T('abdomen.oblicuo', 'abdomen', [[103, 32, 74], [110, 33, 88], [118, 35, 84], [126, 36, 66]]),
   T('abdomen.serrato', 'abdomen', [[119, 64, 84], [125, 62, 88], [131, 64, 84]], { round: 0.15, amp: 1.24 }),
   T('abdomen.transverso', 'abdomen', [[107, 14, 42], [113, 12, 46], [118, 15, 41]], { round: 0.15, amp: 0.78, deep: true }),
 
@@ -555,7 +564,7 @@ const SPECS: Spec[] = [
      y el dorsal se estaba tragando entero al trapecio—, así que su borde
      interno sigue al borde externo del trapecio, capa por capa. */
   T('espalda.dorsal', 'espalda', [
-    [106, 130, 173], [113, 114, 168], [121, 101, 162], [129, 96, 148], [136, 94, 136], [142, 98, 130],
+    [101, 138, 176], [108, 124, 171], [115, 110, 166], [122, 100, 160], [130, 95, 146], [136, 94, 136], [142, 98, 130],
   ], { amp: 1.78 }),
   T('espalda.trapecio-inf', 'espalda', [[118, 170, 180], [125, 154, 180], [132, 139, 180]], { round: 0.15, amp: 1.24 }),
   T('espalda.trapecio-med', 'espalda', [[132, 139, 180], [137, 131, 180], [142, 149, 180]], { round: 0.15, amp: 1.4 }),
@@ -608,21 +617,22 @@ const SPECS: Spec[] = [
   L(null, null, [[0.52, -60, 10], [0.66, -56, 6], [0.82, -50, 0]], { amp: 0.93 }),
 
   /* ── Accidentes de la piel ─────────────────────────────────────────────── */
-  /* Ni músculo ni relleno: los surcos y los huesos que el ojo espera ver. Van
-     en negativo —hunden en vez de levantar— salvo la clavícula y la rótula,
-     que sobresalen. Sin ellos la figura es correcta y parece un maniquí. */
-  T(null, null, [[102, -2.6, 2.6], [116, -2.2, 2.2], [127, -2, 2]], { amp: -1.35, single: true }),
-  T(null, null, [[119, -3, 3], [132, -2.6, 2.6], [145, -3.4, 3.4]], { amp: -0.77, single: true }),
-  T(null, null, [[100, 177.5, 182.5], [124, 177, 183], [150, 177.5, 182.5]], { amp: -1.9, single: true }),
-  T(null, null, [[83, 177, 183], [92, 176, 184], [103, 177, 183]], { amp: -2.6, single: true }),
+  /* Ni músculo ni relleno: los pliegues y los huesos que el ojo espera ver.
+     Los pliegues se apoyan en la piel y se oscurecen hacia el centro; la
+     clavícula y la rótula, al revés, sobresalen y se aclaran. Sin ellos la
+     figura es correcta y parece un maniquí. */
+  T(null, null, [[102, -5.5, 5.5], [116, -5, 5], [127, -4.6, 4.6]], { amp: 0.12, groove: true, single: true }),
+  T(null, null, [[119, -5, 5], [132, -4.6, 4.6], [145, -5.4, 5.4]], { amp: 0.12, groove: true, single: true }),
+  T(null, null, [[100, 174.5, 185.5], [124, 174, 186], [150, 174.5, 185.5]], { amp: 0.12, groove: true, single: true }),
+  T(null, null, [[83, 174, 186], [92, 173, 187], [103, 174, 186]], { amp: 0.12, groove: true, single: true }),
   /* Clavícula: el hueso que remata el pecho por arriba. */
-  T(null, null, [[149, 8, 30], [151, 10, 44], [152.5, 16, 52]], { amp: 0.78 }),
+  T(null, null, [[150, 12, 30], [151.4, 12, 42], [152.6, 18, 46]], { amp: 0.42 }),
   /* Cresta ilíaca y hueco del ombligo. */
-  T(null, null, [[106, 30, 62], [110, 34, 66], [113, 42, 68]], { amp: -0.77 }),
-  T(null, null, [[118, -3, 3], [120, -4, 4], [122, -3, 3]], { amp: -1.19, single: true }),
+  T(null, null, [[106, 30, 62], [110, 34, 66], [113, 42, 68]], { amp: 0.12, groove: true }),
+  T(null, null, [[117.5, -4, 4], [120, -5.5, 5.5], [122.5, -4, 4]], { amp: 0.12, groove: true, single: true }),
   /* Rótula y hueco del codo. */
   L(null, null, [[0.53, -26, 26], [0.57, -30, 30], [0.62, -24, 24]], { amp: 0.7 }),
-  A(null, null, [[0.44, 158, 202], [0.48, 152, 208], [0.53, 158, 202]], { amp: -0.94 }),
+  A(null, null, [[0.44, 158, 202], [0.48, 152, 208], [0.53, 158, 202]], { amp: 0.12, groove: true }),
 ];
 
 /* ── Piel ────────────────────────────────────────────────────────────────── */

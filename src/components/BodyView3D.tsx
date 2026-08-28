@@ -189,6 +189,10 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
     let picked: { point: THREE.Vector3; muscle: Muscle } | null = null;
     let frame = 0;
     let alive = true;
+    /* Con movimiento reducido el cuerpo sigue girando con el dedo —eso es
+       manipulación directa, no animación— pero se le quitan la inercia y el
+       giro automático, que son los que se mueven solos. */
+    const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
     const wake = () => {
       if (alive && !frame) frame = requestAnimationFrame(tick);
@@ -209,12 +213,12 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
         let d = yawTarget - yaw;
         while (d > Math.PI) d -= 2 * Math.PI;
         while (d < -Math.PI) d += 2 * Math.PI;
-        yaw += d * 0.14;
-        if (Math.abs(d) < 0.004) {
+        yaw += calm ? d : d * 0.14;
+        if (calm || Math.abs(d) < 0.004) {
           yaw = yawTarget;
           yawTarget = null;
         } else busy = true;
-      } else if (Math.abs(spin) > 0.0004 && !pointers.size) {
+      } else if (!calm && Math.abs(spin) > 0.0004 && !pointers.size) {
         // Inercia: el cuerpo sigue girando un momento al soltar.
         yaw += spin;
         spin *= 0.94;
@@ -222,7 +226,7 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
       }
 
       if (fade < 1) {
-        fade = Math.min(1, fade + 0.055);
+        fade = calm ? 1 : Math.min(1, fade + 0.055);
         busy = true;
       }
       for (const it of items) it.mat.color.lerpColors(it.from, it.to, fade);
