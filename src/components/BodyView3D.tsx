@@ -105,10 +105,11 @@ const UNTRAINED = '#C6C6BD';
 const MUTED = '#D2D2CA';
 /** Tejido que la app no mide: antebrazo, tibial. */
 const UNMEASURED = '#D8D8D1';
+const MUTED_C = new THREE.Color(MUTED);
 
 /** Distancias de cámara: el cuerpo entero, y lo más cerca que deja acercarse. */
 const FAR = 430;
-const NEAR = 130;
+const NEAR = 100;
 
 export function BodyView3D({
   colorOf,
@@ -130,7 +131,12 @@ export function BodyView3D({
   /* Todo lo que cambia por fotograma vive en refs: si pasara por el estado de
      React, cada grado de giro sería un render del árbol entero. */
   const api = useRef<{
-    setColors: (fn: BodyView3DProps['colorOf'], focus: Muscle | null, detail: boolean) => void;
+    setColors: (
+      fn: BodyView3DProps['colorOf'],
+      focus: Muscle | null,
+      detail: boolean,
+      lit: string | null,
+    ) => void;
     spinTo: (yaw: number, anchor?: { point: Vec3; muscle: Muscle }) => void;
     clearPick: () => void;
   } | null>(null);
@@ -440,16 +446,24 @@ export function BodyView3D({
     /* ── Interfaz hacia React ────────────────────────────────────────────── */
 
     api.current = {
-      setColors(fn, nextFocus, isDetail) {
+      setColors(fn, nextFocus, isDetail, lit) {
         for (const it of items) {
           it.mesh.visible = isDetail ? (!it.part.deep || it.part.muscle === nextFocus) : !it.part.deep;
           const dim = isDetail && it.part.muscle !== nextFocus;
           const c = dim ? null : fn(it.part.muscle as Muscle, isDetail ? it.part.head : null);
           it.from.copy(it.mat.color);
           it.to.set(c ?? (dim ? MUTED : UNTRAINED));
-          /* El grupo elegido se separa del resto con un punto de luz propia,
-             que se lee mejor que un borde sobre una superficie curva. */
-          it.mat.emissive.set(!isDetail && nextFocus && it.part.muscle === nextFocus ? 0x1a1a22 : 0x000000);
+          /* Al elegir una porción en la lista, las demás del grupo se apagan
+             a medias. Resaltar solo la elegida no bastaba: sobre una pieza
+             gris —una porción sin trabajo, que es justo la que uno va a
+             buscar— el brillo no se distinguía de nada. */
+          if (isDetail && lit && it.part.head !== lit) it.to.lerp(MUTED_C, 0.55);
+          /* Lo elegido se separa del resto con un punto de luz propia, que
+             sobre una superficie curva se lee mejor que un borde. En el mapa
+             general es el grupo; en el de detalle, la porción que se acaba de
+             tocar en la lista, para no tener que adivinar cuál es. */
+          const on = isDetail ? lit != null && it.part.head === lit : nextFocus != null && it.part.muscle === nextFocus;
+          it.mat.emissive.set(on ? 0x26262f : 0x000000);
         }
         fade = 0;
         wake();
@@ -487,8 +501,8 @@ export function BodyView3D({
   }, []);
 
   useEffect(() => {
-    api.current?.setColors(colorOf, focus ?? null, detail);
-  }, [colorOf, focus, detail]);
+    api.current?.setColors(colorOf, focus ?? null, detail, faceHead ?? null);
+  }, [colorOf, focus, detail, faceHead]);
 
   useEffect(() => {
     if (!focus && !faceHead) return;
