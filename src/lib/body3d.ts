@@ -101,10 +101,28 @@ function track(rows: readonly number[][], key: number, col: number): number {
  */
 export type Surface = {
   at(u: number, deg: number): Vec3;
-  core(u: number): Vec3;
+  /** Punto del eje bajo (u, deg): dice hacia dónde mira la normal. */
+  core(u: number, deg: number): Vec3;
   /** Rango útil de `u`, para convertir alturas en fracciones. */
   range: [number, number];
 };
+
+/**
+ * La misma superficie con los ejes cambiados: el ángulo pasa a ser la
+ * coordenada larga y la altura la de alrededor.
+ *
+ * Sirve para los músculos en abanico. Un parche normal tiene los bordes de
+ * arriba y de abajo horizontales, así que el pectoral salía como tres franjas
+ * apiladas; girando los ejes, sus divisiones pueden bajar según se alejan del
+ * esternón, que es como convergen de verdad las fibras hacia el húmero.
+ */
+function swapped(s: Surface): Surface {
+  return {
+    range: [-180, 180],
+    at: (deg, u) => s.at(u, deg),
+    core: (deg, u) => s.core(u, deg),
+  };
+}
 
 /** Normal hacia fuera, por diferencias finitas sobre la propia superficie. */
 function normalAt(s: Surface, u: number, deg: number): Vec3 {
@@ -114,7 +132,7 @@ function normalAt(s: Surface, u: number, deg: number): Vec3 {
   const tu = sub(s.at(clamp(u + du, s.range[0], s.range[1]), deg), s.at(clamp(u - du, s.range[0], s.range[1]), deg));
   const tv = sub(s.at(u, deg + 2), s.at(u, deg - 2));
   let n = norm(cross(tv, tu));
-  if (dot(n, sub(p, s.core(u))) < 0) n = mul(n, -1);
+  if (dot(n, sub(p, s.core(u, deg))) < 0) n = mul(n, -1);
   return n;
 }
 
@@ -440,6 +458,8 @@ type Spec = {
   deep?: boolean;
   /** Pieza que va sobre el eje del cuerpo y no se refleja. */
   single?: boolean;
+  /** Recorte en abanico: las filas van por ángulo y dan tramos de altura. */
+  swap?: boolean;
   /**
    * Forma del relieve, de 0 a 1. Bajo aplana el parche como una lámina —el
    * dorsal, el trapecio, el serrato— y alto lo redondea como un vientre —el
@@ -479,6 +499,7 @@ function smoothstep(a: number, b: number, x: number): number {
 }
 
 function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part {
+  const on = s.swap ? swapped(s.on) : s.on;
   const rows = s.rows;
   const span = at(rows, rows.length - 1)[0] - at(rows, 0)[0];
   const u0 = at(rows, 0)[0] + span * INSET_U;
@@ -495,13 +516,13 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
     const u = u0 + (u1 - u0) * fu;
     const a0 = track(rows, u, 1);
     const b0 = track(rows, u, 2);
-    const gap = s.groove ? 0 : Math.min(INSET_DEG, Math.abs(b0 - a0) * 0.18);
+    const gap = s.groove ? 0 : Math.min(s.swap ? 0.9 : INSET_DEG, Math.abs(b0 - a0) * 0.18);
     const a = a0 + gap;
     const b = b0 - gap;
     const fv = j / nv;
     const deg = a + (b - a) * fv;
-    const p = s.on.at(u, deg);
-    const n = normalAt(s.on, u, deg);
+    const p = on.at(u, deg);
+    const n = normalAt(on, u, deg);
     const h = (s.deep ? DEEP_LIFT : 0) + amp * bulge(fu, round) * bulge(fv, round);
     const out = add(p, mul(n, h)) as Vec3;
     const edge = Math.min(Math.min(fu, 1 - fu), Math.min(fv, 1 - fv)) * 2;
@@ -537,11 +558,19 @@ const L = (head: string | null, muscle: Muscle | null, rows: Row[], extra: Parti
 
 const SPECS: Spec[] = [
   /* ── Tronco, delante ───────────────────────────────────────────────────── */
-  /* Pectoral en sus tres porciones: la clavicular se estrecha al subir hacia
-     la clavícula y la abdominal se recoge hacia el esternón. */
-  T('pecho.clavicular', 'pecho', [[143, 4, 64], [146.5, 4, 63], [150, 6, 50]], { round: 0.15, amp: 2.33 }),
-  T('pecho.esternal', 'pecho', [[133, 5, 58], [138, 4, 66], [143, 4, 64]], { round: 0.15, amp: 2.79 }),
-  T('pecho.abdominal', 'pecho', [[126.5, 8, 42], [130, 6, 52], [133, 5, 58]], { round: 0.15, amp: 2.25 }),
+  /* Pectoral en abanico: las filas van por ángulo y dan tramos de altura, de
+     modo que las tres porciones bajan según se alejan del esternón y
+     convergen en el tendón del húmero, que es como van las fibras. Con filas
+     por altura salían tres franjas horizontales apiladas. */
+  T('pecho.clavicular', 'pecho', [
+    [4, 143, 150.5], [26, 141, 149], [46, 138, 145], [62, 136, 141],
+  ], { swap: true, round: 0.2, amp: 2.33 }),
+  T('pecho.esternal', 'pecho', [
+    [4, 133, 143], [26, 132, 141], [46, 131, 138], [62, 132, 136],
+  ], { swap: true, round: 0.25, amp: 2.79 }),
+  T('pecho.abdominal', 'pecho', [
+    [5, 126, 133], [26, 125, 132], [44, 126, 131], [58, 129, 132],
+  ], { swap: true, round: 0.2, amp: 2.25 }),
 
   /* Recto abdominal: la banda pegada a la línea alba. */
   /* El recto va en cuatro bloques por lado, no en una tira: las
