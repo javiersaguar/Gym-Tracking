@@ -174,6 +174,7 @@ src/
     actions.ts     Ciclo de vida de la sesión y edición de la rutina
   components/      Primitivas de interfaz, campos numéricos, gráficos
     BodyView3D.tsx El visor: giro, pellizco, toque y etiqueta sobre la figura
+    thermal.tsx    La escala térmica, su leyenda y las barras de componente
   lib/
     muscleState.ts Puntuación compuesta por grupo, la que colorea el mapa
     headState.ts   Lo mismo por porción, la que colorea el mapa de detalle

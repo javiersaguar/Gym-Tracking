@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { BODY_HEIGHT, bestYaw, buildFiller, buildParts, buildSkin, type Part, type Vec3 } from '../lib/body3d';
-import { UNTRAINED } from './BodyMap';
+import { UNTRAINED } from './thermal';
 import type { Muscle } from '../lib/types';
 
 /* ────────────────────────────────────────────────────────────────────────────

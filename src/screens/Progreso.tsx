@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, lazy, useCallback, useMemo, useState } from "react";
-import { ComponentBar, ThermalLegend, thermal } from "../components/BodyMap";
+import { ComponentBar, ThermalLegend, thermal } from "../components/thermal";
 import type { BodyPick } from "../components/BodyView3D";
 import { BarList, Spark, TrendLine, type BarDatum } from "../components/charts";
 import { MiniBars, RestScatter } from "../components/charts-extra";

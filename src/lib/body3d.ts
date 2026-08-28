@@ -105,7 +105,7 @@ function track(rows: readonly number[][], key: number, col: number): number {
  * coordenada longitudinal `u` y un ángulo `deg`; `core` da el punto del eje a
  * esa altura, que sirve para saber hacia dónde mira la normal.
  */
-export type Surface = {
+type Surface = {
   at(u: number, deg: number): Vec3;
   /** Punto del eje bajo (u, deg): dice hacia dónde mira la normal. */
   core(u: number, deg: number): Vec3;
@@ -838,11 +838,4 @@ export function bestYaw(parts: Part[], muscle: Muscle | null, head?: string | nu
   if (Math.abs(sx) < 1e-3 && Math.abs(sz) < 1e-3) return 0;
   // Signo cambiado: hay que girar el cuerpo hacia la cámara, no al revés.
   return -Math.atan2(sx, sz);
-}
-
-/** Altura media del grupo, para centrar la cámara al ampliarlo. */
-export function centerY(parts: Part[], muscle: Muscle): number {
-  const mine = parts.filter((p) => p.muscle === muscle);
-  if (!mine.length) return 110;
-  return mine.reduce((s, p) => s + p.center[1], 0) / mine.length;
 }
