@@ -71,6 +71,7 @@ const START: Record<string, { w: number; reps: number; gain: number; step: numbe
   aductor: { w: 45, reps: 13, gain: 0.22, step: 5, rest: 80 },
   'gemelo-pie': { w: 60, reps: 14, gain: 0.26, step: 5, rest: 65 },
   'rumano-maquina': { w: 50, reps: 10, gain: 0.24, step: 2.5, rest: 140 },
+  'hip-thrust-maquina': { w: 70, reps: 11, gain: 0.28, step: 5, rest: 150 },
   prensa: { w: 150, reps: 9, gain: 0.3, step: 10, rest: 210 },
   'femoral-sentado': { w: 45, reps: 11, gain: 0.24, step: 2.5, rest: 110 },
   'extension-cuadriceps': { w: 50, reps: 12, gain: 0.26, step: 2.5, rest: 100 },

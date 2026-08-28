@@ -255,6 +255,21 @@ export const EXERCISE_HEADS: Record<string, HeadSplit> = {
     femoral: { 'femoral.biceps': 0.4, 'femoral.semitendinoso': 0.32, 'femoral.semimembranoso': 0.28 },
     gluteo: { 'gluteo.mayor': 0.85, 'gluteo.medio': 0.12, 'gluteo.menor': 0.03 },
   },
+  'hip-thrust-maquina': {
+    /* Cadera extendiendo con la rodilla doblada: el femoral trabaja acortado y
+       apenas aporta, así que el glúteo mayor se lleva casi todo. Es el
+       ejercicio que más lo aísla de la rutina. */
+    gluteo: { 'gluteo.mayor': 0.82, 'gluteo.medio': 0.14, 'gluteo.menor': 0.04 },
+    femoral: { 'femoral.biceps': 0.38, 'femoral.semitendinoso': 0.34, 'femoral.semimembranoso': 0.28 },
+    cuadriceps: {
+      /* La rodilla se queda fija: los vastos sujetan y el recto, que cruza la
+         cadera, va en contra del movimiento. */
+      'cuadriceps.recto': 0.14,
+      'cuadriceps.vasto-lateral': 0.34,
+      'cuadriceps.vasto-medial': 0.3,
+      'cuadriceps.vasto-intermedio': 0.22,
+    },
+  },
   prensa: {
     cuadriceps: {
       'cuadriceps.recto': 0.2,

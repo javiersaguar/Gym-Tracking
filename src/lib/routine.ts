@@ -127,6 +127,12 @@ const CATALOG = {
     muscles: [['femoral', 0.55], ['gluteo', 0.45]],
     reps: [6, 10],
   },
+  'hip-thrust-maquina': {
+    name: 'Hip thrust en máquina',
+    muscles: [['gluteo', 0.7], ['femoral', 0.2], ['cuadriceps', 0.1]],
+    reps: [8, 12],
+    notes: 'Extensión de cadera con la rodilla doblada: el glúteo mayor sin que el femoral tape.',
+  },
   prensa: {
     name: 'Prensa',
     muscles: [['cuadriceps', 0.65], ['gluteo', 0.25], ['femoral', 0.1]],
