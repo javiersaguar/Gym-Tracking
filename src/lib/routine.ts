@@ -106,6 +106,12 @@ const CATALOG = {
     muscles: [['triceps', 1]],
     reps: [8, 12],
   },
+  'triceps-nuca': {
+    name: 'Tríceps tras nuca',
+    muscles: [['triceps', 1]],
+    reps: [8, 12],
+    notes: 'Con el codo arriba la cabeza larga trabaja estirada: es la que más carga.',
+  },
   aductor: {
     name: 'Aductor',
     muscles: [['aductor', 1]],

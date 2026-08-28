@@ -235,6 +235,12 @@ export const EXERCISE_HEADS: Record<string, HeadSplit> = {
     /* Codo delante y hombro neutro: lateral y medial por delante de la larga. */
     triceps: T(0.22, 0.45, 0.33),
   },
+  'triceps-nuca': {
+    /* Codo por encima de la cabeza: la larga cruza el hombro y trabaja
+       estirada, así que aquí manda ella. Es justo el reparto contrario al de
+       la extensión con el codo delante, y por eso conviene tener las dos. */
+    triceps: T(0.5, 0.28, 0.22),
+  },
 
   /* ── Pierna ────────────────────────────────────────────────────────────── */
 

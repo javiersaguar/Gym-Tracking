@@ -67,6 +67,7 @@ const START: Record<string, { w: number; reps: number; gain: number; step: numbe
   'cruces-polea-inclinado': { w: 10, reps: 12, gain: 0.3, step: 1, rest: 85 },
   'contractora': { w: 35, reps: 11, gain: 0.24, step: 2.5, rest: 90 },
   'extension-triceps': { w: 25, reps: 11, gain: 0.28, step: 1, rest: 90 },
+  'triceps-nuca': { w: 20, reps: 11, gain: 0.28, step: 1, rest: 95 },
   aductor: { w: 45, reps: 13, gain: 0.22, step: 5, rest: 80 },
   'gemelo-pie': { w: 60, reps: 14, gain: 0.26, step: 5, rest: 65 },
   'rumano-maquina': { w: 50, reps: 10, gain: 0.24, step: 2.5, rest: 140 },
