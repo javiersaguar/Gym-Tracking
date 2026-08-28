@@ -355,8 +355,12 @@ export const BODY_HEIGHT = 180;
 
 /* [y, semianchura, profundidad delante, profundidad detrás] */
 const TORSO_RINGS: number[][] = [
-  [74, 13.8, 8.8, 10.2],
-  [80, 15.2, 9.4, 11.8],
+  /* El tronco acaba por abajo más estrecho que el muslo, para que su borde
+     quede escondido dentro de él: si asoma por fuera se ve un escalón en la
+     cadera cada vez que la figura pasa de perfil. */
+  [69, 9.0, 6.4, 7.2],
+  [75, 12.6, 8.4, 10.2],
+  [81, 15.2, 9.5, 12.2],
   [86, 16.1, 9.8, 12.8],
   [92, 16.4, 10.0, 13.2],
   [98, 16.2, 9.9, 12.4],
@@ -775,7 +779,7 @@ function foot(): MeshData {
 
 export function buildSkin(): MeshData {
   return merge([
-    tube(TORSO, 74.5, 156.2, 36),
+    tube(TORSO, 69.4, 156.2, 38),
     tube(NECK, 143.5, 159.8, 10, 24),
     tube(HEAD, 156.5, 180.4, 20, 26),
     tube(ARM, 0.02, 1, 44),
