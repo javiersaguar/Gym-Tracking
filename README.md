@@ -30,10 +30,14 @@ no hay servidor, ni cuenta, ni red que se pueda caer a mitad de una serie.
 - **Análisis al cerrar el entreno.** Índice de progreso por grupo muscular, récords batidos, lectura de
   qué ha pasado y qué peso tocar la próxima vez en cada ejercicio.
 - **Progreso, en cuatro vistas** y con el tramo de días que elijas (7, 14, 30, 90 o un año):
-  - **Mapa** — dos láminas anatómicas, de frente y de espalda, donde **cada músculo es una pieza del
-    dibujo** y se colorea él, no una mancha encima. Escala térmica como la de un mapa del tiempo: azul
-    lo menos entrenado, rojo lo más. El color no son los kilos: es cómo de atendido está el grupo,
-    mezclando volumen semanal, frecuencia, RIR y progreso. Se toca un músculo y se ve el desglose.
+  - **Mapa** — una figura en tres dimensiones que **se gira los 360 grados arrastrando** y se acerca
+    pellizcando, donde **cada músculo es una pieza del cuerpo** y se colorea él, no una mancha encima.
+    Al tocar un músculo sale su nombre y, desde ahí, se entra a su **mapa de detalle**: el grupo
+    abierto por porciones, cada una con su propio color según el trabajo que ha recibido —las tres
+    cabezas del tríceps, las cuatro del cuádriceps, la espalda separada en trapecio, dorsal, redondo y
+    romboides—. Escala térmica como la de un mapa del tiempo: azul lo menos entrenado, rojo lo más. El
+    color no son los kilos: es cómo de atendido está el grupo, mezclando volumen semanal, frecuencia,
+    RIR y progreso.
   - **Kilos** — tonelaje total por músculo y por ejercicio, desde series × repeticiones × peso.
   - **Fuerza** — evolución del 1RM estimado, tonelaje sesión a sesión y **tabla de récords por
     repetición** (mejor peso a 5, a 8, a 10…) de cada ejercicio.
@@ -114,6 +118,22 @@ tocarlo para que el número no haya que creérselo a ciegas:
 | **Intensidad** | RIR medio: acercarse al fallo sin pasarse de largo |
 | **Progreso** | índice de las sesiones del periodo |
 
+### El mapa de detalle
+
+Al entrar en un grupo, la misma figura se gira sola para ponerlo de cara y se colorea por porciones.
+Cada serie se reparte dos veces: primero entre grupos, con el reparto del ejercicio, y después entre
+las porciones de cada grupo. Un jalón con agarre cerrado carga 0,62 de dorsal y 0,08 de romboides; un
+remo, al revés. Los veinticuatro ejercicios del catálogo llevan su reparto declarado, y si alguna vez
+se añade uno que no lo tenga, sus series se reparten a partes iguales y la lista lo dice.
+
+La referencia de cada porción es la franja semanal del grupo dividida a partes iguales. Es una
+simplificación conocida —no todas las porciones necesitan el mismo trabajo—, y por eso la lista enseña
+las series de cada una al lado del color en vez de dejar solo el número.
+
+Cuatro músculos quedan tapados por otro en el cuerpo: romboides, vasto intermedio, glúteo menor y
+transverso. El mapa general no los dibuja; el de detalle los levanta encajados dentro del que los
+cubre, como la ventana de una lámina de anatomía, y los marca como capa profunda.
+
 ## Instalar en el móvil
 
 Ábrela en el navegador y añádela a la pantalla de inicio (**Compartir → Añadir a pantalla de inicio**
@@ -131,7 +151,7 @@ una copia descargable en JSON y su restauración.
 ```bash
 npm install
 npm run dev        # servidor de desarrollo
-npm test           # tests del algoritmo (métricas, análisis, ciclo)
+npm test           # 127 pruebas: algoritmo, reparto por porciones y malla del cuerpo
 npm run build      # build de producción + service worker
 npm run preview    # sirve el build, con el modo sin conexión activo
 npm run icons      # regenera los PNG del icono a partir de public/icon.svg
@@ -153,8 +173,12 @@ src/
     timer.ts       Cronómetro de descanso (fuera de React, sobrevive a recargas)
     actions.ts     Ciclo de vida de la sesión y edición de la rutina
   components/      Primitivas de interfaz, campos numéricos, gráficos
+    BodyView3D.tsx El visor: giro, pellizco, toque y etiqueta sobre la figura
   lib/
     muscleState.ts Puntuación compuesta por grupo, la que colorea el mapa
+    headState.ts   Lo mismo por porción, la que colorea el mapa de detalle
+    heads.ts       Catálogo de porciones y reparto de cada ejercicio entre ellas
+    body3d.ts      La figura: superficies del cuerpo y recorte de cada músculo
     csv.ts         Exportación e importación del registro, fila por serie
   screens/         Portada · Hoy · Entreno · Resumen · Progreso · Registro · Historial · Rutina · Ajustes
 scripts/
@@ -186,9 +210,31 @@ corporal la convención meteorológica ya la sabe leer cualquiera. Se compensa p
 van además de oscuro a claro y de vuelta a saturado, cada músculo lleva su cifra escrita en la lista de
 al lado, y la leyenda es un degradado continuo rotulado de 0 a 100.
 
-La anatomía (`src/components/anatomy.ts`) no se escribe como curvas Bézier a mano: cada pieza se
-declara como una tabla de anchuras a distintas alturas y el trazo se genera interpolando. Ajustar
-puntos de control a ciegas daba muñecos de jengibre; así la forma es un dato que se lee y se corrige.
+### La figura
+
+No viene de ningún modelo descargado: se genera con código (`src/lib/body3d.ts`), que es la única
+forma de que la app siga funcionando sin conexión y de que pese lo que pesa. Se construye en dos
+capas. La piel son superficies paramétricas: el tronco, un perfil de secciones horizontales apiladas;
+cada extremidad, un tubo que sigue el eje del hueso, con un triedro en cada punto para que «hacia
+fuera» signifique lo mismo arriba que abajo. Encima, cada músculo es un recorte sobre esa misma piel
+—un tramo de alturas y de ángulos— que se levanta con un perfil abombado y vuelve a ella en los
+bordes, de modo que forma parte del cuerpo en vez de flotar sobre él.
+
+Cada recorte declara además su forma: baja aplana la pieza como una lámina (dorsal, trapecio,
+serrato), alta la redondea como un vientre (bíceps, gemelo, deltoides). El pectoral se declara con los
+ejes cambiados, por filas de ángulo en vez de altura, porque sus fibras convergen en el húmero y con
+filas de altura salía como tres franjas apiladas.
+
+Los pliegues —línea alba, canal de la columna, esternón, cresta de la tibia— se apoyan sobre la piel y
+se oscurecen hacia el centro. Se probó a hundirlos y no se veía ninguno: un parche metido hacia dentro
+queda por detrás de la propia piel, y lo que se veía era la junta clara entre los dos lados, es decir,
+una raya blanca justo donde tenía que haber una sombra.
+
+Los dos lados de un músculo van en la misma malla —el mapa nunca colorea medio bíceps— y todo lo que no
+se mide va en una sola malla de relleno: cuarenta y cuatro llamadas de dibujo en total. El motor de
+gráficos se carga aparte y solo al abrir Progreso, así que la portada y la pantalla de entreno no lo
+tocan; el service worker lo precachea igual. Si el navegador no puede dibujar en 3D, el visor lo dice y
+remite a la lista, que tiene los mismos datos.
 
 Las skills de diseño que guían todo esto están en `.claude/skills/`: `minimalist-skill` y
 `redesign-skill` para el sistema visual, `apple-design` y `emil-design-eng` para el movimiento y el

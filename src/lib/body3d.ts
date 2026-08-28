@@ -698,7 +698,7 @@ const SPECS: Spec[] = [
   L('cuadriceps.vasto-intermedio', 'cuadriceps', [[0.13, -12, 12], [0.25, -14, 14], [0.37, -12, 12]], { round: 0.15, amp: 0.78, deep: true }),
   L('cuadriceps.recto', 'cuadriceps', [[0.02, -26, 26], [0.16, -24, 26], [0.32, -22, 24], [0.44, -20, 20]], { round: 0.85, amp: 1.63 }),
   L('cuadriceps.vasto-lateral', 'cuadriceps', [[0.02, 26, 76], [0.14, 24, 82], [0.3, 22, 80], [0.44, 20, 62]], { round: 0.85, amp: 1.78 }),
-  L('cuadriceps.vasto-medial', 'cuadriceps', [[0.2, -60, -24], [0.32, -66, -22], [0.4, -70, -20], [0.47, -58, -18]], { round: 0.85, amp: 1.71 }),
+  L('cuadriceps.vasto-medial', 'cuadriceps', [[0.2, -58, -24], [0.32, -64, -22], [0.42, -68, -19], [0.53, -52, -17]], { round: 0.85, amp: 1.71 }),
   L('aductor.largo', 'aductor', [[0.0, -85, -60], [0.1, -88, -58], [0.24, -86, -62]], { amp: 1.4 }),
   L('aductor.gracil', 'aductor', [[0.03, -106, -86], [0.24, -108, -88], [0.45, -104, -86]], { amp: 1.08 }),
   L('aductor.mayor', 'aductor', [[0.0, -150, -106], [0.12, -152, -108], [0.28, -148, -106]], { amp: 1.47 }),
@@ -712,7 +712,10 @@ const SPECS: Spec[] = [
   L('gemelo.gastro-lateral', 'gemelo', [[0.52, 108, 178], [0.6, 100, 178], [0.7, 104, 178], [0.79, 116, 176]], { round: 0.85, amp: 1.71 }),
   L('gemelo.gastro-medial', 'gemelo', [[0.52, 182, 252], [0.6, 182, 260], [0.7, 182, 256], [0.8, 184, 244]], { round: 0.85, amp: 1.86 }),
   L('gemelo.soleo', 'gemelo', [[0.78, 96, 264], [0.87, 108, 252], [0.95, 122, 238]], { amp: 1.16 }),
-  L(null, null, [[0.52, -60, 10], [0.66, -56, 6], [0.82, -50, 0]], { amp: 0.93 }),
+  L(null, null, [[0.52, -60, 10], [0.66, -56, 6], [0.82, -50, 0]], { amp: 0.93, round: 0.75 }),
+  /* Cresta de la tibia: el hueso que se toca por delante de la espinilla. Sin
+     ella la pierna de frente es un tubo liso de veinte centímetros. */
+  L(null, null, [[0.62, -9, 3], [0.76, -7, 5], [0.9, -5, 7]], { amp: 0.12, groove: true }),
 
   /* ── Accidentes de la piel ─────────────────────────────────────────────── */
   /* Ni músculo ni relleno: los pliegues y los huesos que el ojo espera ver.
@@ -729,7 +732,7 @@ const SPECS: Spec[] = [
   T(null, null, [[106, 30, 62], [110, 34, 66], [113, 42, 68]], { amp: 0.12, groove: true }),
   T(null, null, [[117.5, -4, 4], [120, -5.5, 5.5], [122.5, -4, 4]], { amp: 0.12, groove: true, single: true }),
   /* Rótula y hueco del codo. */
-  L(null, null, [[0.53, -26, 26], [0.57, -30, 30], [0.62, -24, 24]], { amp: 0.7 }),
+  L(null, null, [[0.55, -24, 24], [0.59, -29, 29], [0.65, -22, 22]], { amp: 0.75 }),
   A(null, null, [[0.44, 158, 202], [0.48, 152, 208], [0.53, 158, 202]], { amp: 0.12, groove: true }),
 ];
 
