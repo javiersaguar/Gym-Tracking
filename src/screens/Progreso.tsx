@@ -193,19 +193,24 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
     [byMuscle, byHead],
   );
 
-  const info = detail
-    ? tapped?.head
+  /* Qué dice el cartel. Dentro del detalle, tocar una porción del grupo da su
+     nombre; tocar cualquier otro sitio del cuerpo da el grupo al que pertenece
+     y ofrece entrar en él, que es como se navega de un grupo a otro sin volver
+     atrás. Fuera del detalle, siempre el grupo. */
+  const insideDetail = !!detail && tapped?.muscle === detail && !!tapped.head;
+  const info = !tapped
+    ? null
+    : insideDetail
       ? {
-          title: HEAD_BY_ID[tapped.head]?.label ?? "",
-          score: byHead.get(tapped.head)?.score ?? null,
+          title: HEAD_BY_ID[tapped.head as string]?.label ?? MUSCLE_LABEL[tapped.muscle],
+          score: byHead.get(tapped.head as string)?.score ?? null,
+          jump: null,
         }
-      : null
-    : tapped
-      ? {
+      : {
           title: MUSCLE_LABEL[tapped.muscle],
           score: byMuscle.get(tapped.muscle)?.score ?? null,
-        }
-      : null;
+          jump: tapped.muscle,
+        };
 
   const open = (m: Muscle) => {
     haptic();
@@ -284,9 +289,9 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                           {info.score ?? "—"}
                         </span>
                       </div>
-                      {!detail && tapped && (
+                      {info.jump && (
                         <button
-                          onClick={() => open(tapped.muscle)}
+                          onClick={() => open(info.jump as Muscle)}
                           className="mt-1 block text-micro font-medium text-accent transition-colors duration-press hover:text-ink"
                         >
                           Ver sus músculos →

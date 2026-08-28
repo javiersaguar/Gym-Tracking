@@ -218,7 +218,11 @@ export function BodyView3D({
       root.add(mesh);
       return { part, mesh, mat, from: new THREE.Color(SKIN), to: new THREE.Color(SKIN) };
     });
-    const pickable = items.filter((i) => i.part.muscle).map((i) => i.mesh);
+    /* La lista de lo que se puede tocar se arma en cada toque, no una vez: el
+       trazador de rayos no mira si una malla está oculta, y las capas
+       profundas van levantadas por encima de la que las tapa. Sin esto, un
+       toque sobre el trapecio devolvía el romboides invisible de debajo. */
+    const pickable = () => items.filter((i) => i.mesh.visible).map((i) => i.mesh);
 
     /* ── Cámara y gestos ─────────────────────────────────────────────────── */
 
@@ -418,7 +422,7 @@ export function BodyView3D({
         -((e.clientY - rect.top) / rect.height) * 2 + 1,
       );
       ray.setFromCamera(ndc, camera);
-      const hit = ray.intersectObjects(pickable, false)[0];
+      const hit = ray.intersectObjects(pickable(), false)[0];
       if (!hit) {
         picked = null;
         pick.current?.(null);
