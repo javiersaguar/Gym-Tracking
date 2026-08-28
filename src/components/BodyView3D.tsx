@@ -290,7 +290,11 @@ export function BodyView3D({
       /* Si el punto ha quedado detrás del cuerpo al girar, la etiqueta sobra:
          estaría señalando a un músculo que ya no se ve. */
       const facing = picked.point.clone().applyMatrix4(new THREE.Matrix4().extractRotation(root.matrixWorld));
-      const behind = facing.z < -2 && Math.abs(facing.x) < 12;
+      /* El eje del cuerpo está en el centro, así que la z del punto girado dice
+         por sí sola de qué lado ha quedado. La condición anterior pedía además
+         que el punto estuviera cerca de la línea media, y por eso el cartel de
+         un bíceps seguía puesto con el brazo ya de espaldas. */
+      const behind = facing.z < -1.5;
       node.style.opacity = v.z > 1 || behind ? '0' : '1';
       const rect = renderer.domElement.getBoundingClientRect();
       const x = ((v.x + 1) / 2) * rect.width;
@@ -327,6 +331,7 @@ export function BodyView3D({
     let pinchFrom = 0;
     let distFrom = 0;
     let lastTap = 0;
+    let lastMove = 0;
 
     const canvas = renderer.domElement;
     const spread = () => {
@@ -363,6 +368,7 @@ export function BodyView3D({
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       moved += Math.abs(dx) + Math.abs(dy);
 
+      lastMove = performance.now();
       if (pointers.size >= 2) {
         const now = spread();
         if (pinchFrom > 0 && now > 0) {
@@ -380,6 +386,10 @@ export function BodyView3D({
     };
 
     const onUp = (e: PointerEvent) => {
+      /* Si el dedo se ha parado antes de levantarse, no hay lanzamiento: sin
+         esto la figura salía disparada con la última velocidad registrada, que
+         podía ser de hace medio segundo. */
+      if (performance.now() - lastMove > 90) spin = 0;
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinchFrom = 0;
       if (pointers.size === 0 && moved < 10 && performance.now() - startAt < 500) {
