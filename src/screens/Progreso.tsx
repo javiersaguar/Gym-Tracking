@@ -313,6 +313,11 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
                   <span className="min-w-0 flex-1">
                     <span className="block text-body text-ink">
                       {HEAD_BY_ID[h.id]?.label ?? h.id}
+                      {/* En el cuerpo va tapada por otro músculo: el mapa la
+                          levanta para poder enseñarla, y conviene decirlo. */}
+                      {HEAD_BY_ID[h.id]?.deep && (
+                        <span className="ml-2 align-middle text-micro text-ink-faint">capa profunda</span>
+                      )}
                     </span>
                     <span className="tnum block text-micro text-ink-faint">
                       {h.sets > 0

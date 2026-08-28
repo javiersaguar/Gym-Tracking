@@ -25,10 +25,28 @@ import type { Muscle } from '../lib/types';
 /** Geometría compartida: se genera al primer uso y ya no se vuelve a tocar. */
 let cached: { skin: THREE.BufferGeometry; parts: { part: Part; geometry: THREE.BufferGeometry }[] } | null = null;
 
-function geometryOf(m: { positions: Float32Array; normals: Float32Array; indices: Uint32Array }) {
+function geometryOf(m: {
+  positions: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+  shade?: Float32Array;
+}) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(m.normals, 3));
+  if (m.shade) {
+    /* La sombra de contacto viaja como color por vértice y multiplica al del
+       material, así que basta con cambiar el color del músculo para repintar
+       el mapa: el relieve se mantiene solo. */
+    const rgb = new Float32Array(m.shade.length * 3);
+    for (let i = 0; i < m.shade.length; i++) {
+      const v = m.shade[i] as number;
+      rgb[i * 3] = v;
+      rgb[i * 3 + 1] = v;
+      rgb[i * 3 + 2] = v;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
+  }
   g.setIndex(new THREE.BufferAttribute(m.indices, 1));
   g.computeBoundingSphere();
   return g;
@@ -146,7 +164,12 @@ export function BodyView3D({ colorOf, focus, detail = false, onPick, tag: tagNod
 
     type Item = { part: Part; mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; from: THREE.Color; to: THREE.Color };
     const items: Item[] = parts.map(({ part, geometry }) => {
-      const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(SKIN), roughness: 0.78, metalness: 0 });
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(SKIN),
+        roughness: 0.74,
+        metalness: 0,
+        vertexColors: true,
+      });
       const mesh = new THREE.Mesh(geometry, mat);
       mesh.visible = !part.deep;
       mesh.userData = { part };

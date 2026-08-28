@@ -34,6 +34,15 @@ export type MeshData = {
 };
 
 export type Part = MeshData & {
+  /**
+   * Luz propia de cada vértice, de 0 a 1, que multiplica al color del músculo.
+   *
+   * Va oscura en el borde del parche y clara en el vientre. Es una sombra de
+   * contacto barata: sin ella los músculos son manchas planas pegadas unas a
+   * otras, y con ella cada uno se despega de la piel y de sus vecinos aunque
+   * el mapa de calor les dé a los dos el mismo color.
+   */
+  shade: Float32Array;
   /** Identificador único de la malla (incluye el lado). */
   id: string;
   muscle: Muscle | null;
@@ -434,9 +443,11 @@ type Spec = {
 };
 
 /* Los músculos profundos se separan de la piel más de lo que les tocaría: en
-   el mapa de detalle se dibujan por encima del que los tapa, como una lámina
-   levantada, y si no quedarían enterrados dentro de él. */
-const DEEP_LIFT = 2.4;
+   el mapa de detalle se dibujan por encima del que los tapa. Sus recortes son
+   además más pequeños que los de ese músculo y quedan encajados dentro, como
+   la ventana de una lámina de anatomía: así se ven los dos, y no uno tapando
+   al otro por completo. */
+const DEEP_LIFT = 1.9;
 
 /* Perfil del abombado: lleno en el centro y a cero en los bordes, para que el
    parche nazca de la piel y no se vea el escalón del recorte. El exponente
@@ -454,6 +465,12 @@ const bulge = (x: number, round: number) => Math.sin(Math.PI * clamp(x, 0, 1)) *
 const INSET_DEG = 2.2;
 const INSET_U = 0.025;
 
+/** Curva en S entre dos umbrales, para que la sombra del borde no dé un corte. */
+function smoothstep(a: number, b: number, x: number): number {
+  const t = clamp((x - a) / (b - a || 1), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part {
   const rows = s.rows;
   const span = at(rows, rows.length - 1)[0] - at(rows, 0)[0];
@@ -465,6 +482,7 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
   let cx = 0;
   let cy = 0;
   let cz = 0;
+  const shade = new Float32Array((nu + 1) * (nv + 1));
   const mesh = grid(nu, nv, (i, j) => {
     const fu = i / nu;
     const u = u0 + (u1 - u0) * fu;
@@ -479,6 +497,8 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
     const n = normalAt(s.on, u, deg);
     const h = (s.deep ? DEEP_LIFT : 0) + amp * bulge(fu, round) * bulge(fv, round);
     const out = add(p, mul(n, h)) as Vec3;
+    const edge = Math.min(Math.min(fu, 1 - fu), Math.min(fv, 1 - fv)) * 2;
+    shade[i * (nv + 1) + j] = 0.82 + 0.18 * smoothstep(0, 0.26, edge);
     cx += out[0];
     cy += out[1];
     cz += out[2];
@@ -490,6 +510,7 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
   const data = side === 1 ? mesh : mirror(mesh);
   return {
     ...data,
+    shade,
     id: `${s.head ?? 'piel'}-${index}#${side}`,
     muscle: s.muscle,
     head: s.head,
@@ -514,31 +535,39 @@ const SPECS: Spec[] = [
   T('pecho.abdominal', 'pecho', [[126.5, 8, 42], [130, 6, 52], [133, 5, 58]], { round: 0.15, amp: 2.25 }),
 
   /* Recto abdominal: la banda pegada a la línea alba. */
-  T('abdomen.recto', 'abdomen', [[102, 4, 20], [110, 3, 26], [118, 3, 27], [126, 3, 25]], { round: 0.85, amp: 1.47 }),
-  T('abdomen.oblicuo', 'abdomen', [[103, 26, 50], [110, 26, 64], [118, 27, 66], [126, 30, 62]]),
+  /* El recto va en cuatro bloques por lado, no en una tira: las
+     intersecciones tendinosas son lo que hace que un abdomen parezca un
+     abdomen, y una banda lisa de veinticinco centímetros no lo parece. */
+  T('abdomen.recto', 'abdomen', [[102, 5, 24], [105, 4, 30], [107.6, 4, 29]], { round: 0.85, amp: 1.3 }),
+  T('abdomen.recto', 'abdomen', [[108.8, 4, 30], [112, 3, 32], [114.6, 3, 31]], { round: 0.85, amp: 1.45 }),
+  T('abdomen.recto', 'abdomen', [[115.8, 3, 31], [119, 3, 33], [121.4, 3, 32]], { round: 0.85, amp: 1.5 }),
+  T('abdomen.recto', 'abdomen', [[122.6, 3, 32], [125, 3, 32], [127.4, 4, 29]], { round: 0.85, amp: 1.4 }),
+  T('abdomen.oblicuo', 'abdomen', [[103, 32, 52], [110, 33, 66], [118, 35, 68], [126, 36, 64]]),
   T('abdomen.serrato', 'abdomen', [[119, 64, 84], [125, 62, 88], [131, 64, 84]], { round: 0.15, amp: 1.24 }),
-  T('abdomen.transverso', 'abdomen', [[104, 6, 54], [112, 5, 58], [119, 6, 54]], { round: 0.15, amp: 0.78, deep: true }),
+  T('abdomen.transverso', 'abdomen', [[107, 14, 42], [113, 12, 46], [118, 15, 41]], { round: 0.15, amp: 0.78, deep: true }),
 
   /* ── Tronco, espalda ───────────────────────────────────────────────────── */
-  T('espalda.erectores', 'espalda', [[101, 165, 180], [110, 160, 180], [120, 160, 180], [128, 163, 180]], { amp: 1.4 }),
-  T('espalda.romboides', 'espalda', [[132, 150, 178], [139, 146, 178], [146, 150, 178]], { round: 0.15, amp: 0.85, deep: true }),
-  /* Dorsal: arriba es solo el pliegue de la axila y abajo llega a la columna.
-     Estrechar los dos bordes daba un reloj de arena; el borde interno se queda
-     pegado a la columna y solo se mueve el de fuera. */
+  T('espalda.erectores', 'espalda', [[100, 164, 180], [110, 161, 180], [122, 167, 180]], { amp: 1.4 }),
+  T('espalda.romboides', 'espalda', [[134, 151, 173], [137, 148, 176], [140, 152, 173]], { round: 0.15, amp: 0.85, deep: true }),
+  /* Dorsal: arriba es solo el pliegue de la axila y abajo se abre hacia la
+     columna. Los bordes de la espalda se reparten el territorio en vez de
+     pisarse —cuando dos parches ocupan el mismo sitio gana el que más abulta,
+     y el dorsal se estaba tragando entero al trapecio—, así que su borde
+     interno sigue al borde externo del trapecio, capa por capa. */
   T('espalda.dorsal', 'espalda', [
-    [111, 124, 179], [119, 104, 179], [128, 96, 178], [137, 94, 176], [146, 96, 122],
+    [106, 130, 173], [113, 114, 168], [121, 101, 162], [129, 96, 148], [136, 94, 136], [142, 98, 130],
   ], { amp: 1.78 }),
-  T('espalda.trapecio-inf', 'espalda', [[119, 166, 180], [126, 152, 180], [133, 139, 180]], { round: 0.15, amp: 1.24 }),
-  T('espalda.trapecio-med', 'espalda', [[133, 139, 180], [139, 131, 180], [145, 145, 180]], { round: 0.15, amp: 1.4 }),
+  T('espalda.trapecio-inf', 'espalda', [[118, 170, 180], [125, 154, 180], [132, 139, 180]], { round: 0.15, amp: 1.24 }),
+  T('espalda.trapecio-med', 'espalda', [[132, 139, 180], [137, 131, 180], [142, 149, 180]], { round: 0.15, amp: 1.4 }),
   /* El superior y el medio se pisaban cerca de la columna y el solapamiento
      hacía un galón brillante en la nuca; ahora comparten borde. */
   T('espalda.trapecio-sup', 'espalda', [
-    [142, 58, 142], [146, 60, 145], [151, 84, 180], [156, 124, 180],
+    [142, 149, 180], [147, 122, 180], [151, 86, 180], [156, 62, 180],
   ], { round: 0.15, amp: 1.55 }),
-  T('espalda.redondo', 'espalda', [[134, 102, 122], [138, 96, 124], [142, 98, 118]], { amp: 1.32 }),
+  T('espalda.redondo', 'espalda', [[140, 100, 126], [144, 96, 130], [148, 101, 124]], { amp: 1.32 }),
 
   /* ── Glúteo ────────────────────────────────────────────────────────────── */
-  T('gluteo.menor', 'gluteo', [[100, 88, 124], [105, 86, 126], [110, 90, 122]], { round: 0.15, amp: 0.78, deep: true }),
+  T('gluteo.menor', 'gluteo', [[102, 96, 118], [105.5, 93, 121], [109, 97, 117]], { round: 0.15, amp: 0.78, deep: true }),
   T('gluteo.medio', 'gluteo', [[100, 84, 130], [106, 78, 134], [112, 92, 128]], { round: 0.85, amp: 1.4 }),
   T('gluteo.mayor', 'gluteo', [[83, 116, 176], [90, 108, 180], [98, 112, 180], [104, 132, 180]], { round: 0.85, amp: 2.02 }),
 
@@ -559,7 +588,7 @@ const SPECS: Spec[] = [
   A(null, null, [[0.47, -140, 40], [0.6, -144, 36], [0.72, -136, 44]], { amp: 1.01 }),
 
   /* ── Muslo ─────────────────────────────────────────────────────────────── */
-  L('cuadriceps.vasto-intermedio', 'cuadriceps', [[0.06, -22, 22], [0.24, -20, 20], [0.42, -18, 18]], { round: 0.15, amp: 0.78, deep: true }),
+  L('cuadriceps.vasto-intermedio', 'cuadriceps', [[0.13, -12, 12], [0.25, -14, 14], [0.37, -12, 12]], { round: 0.15, amp: 0.78, deep: true }),
   L('cuadriceps.recto', 'cuadriceps', [[0.02, -26, 26], [0.16, -24, 26], [0.32, -22, 24], [0.44, -20, 20]], { round: 0.85, amp: 1.63 }),
   L('cuadriceps.vasto-lateral', 'cuadriceps', [[0.02, 26, 76], [0.14, 24, 82], [0.3, 22, 80], [0.44, 20, 62]], { round: 0.85, amp: 1.78 }),
   L('cuadriceps.vasto-medial', 'cuadriceps', [[0.2, -60, -24], [0.32, -66, -22], [0.4, -70, -20], [0.47, -58, -18]], { round: 0.85, amp: 1.71 }),
