@@ -202,7 +202,9 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
     ? null
     : insideDetail
       ? {
-          title: HEAD_BY_ID[tapped.head as string]?.label ?? MUSCLE_LABEL[tapped.muscle],
+          title:
+            HEAD_BY_ID[tapped.head as string]?.label ??
+            MUSCLE_LABEL[tapped.muscle],
           score: byHead.get(tapped.head as string)?.score ?? null,
           jump: null,
         }
@@ -252,7 +254,10 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
         </p>
 
         <Card className="overflow-hidden p-0">
-          <div className="relative h-[430px]">
+          {/* Alto en proporción a la pantalla: en un móvil pequeño una tarjeta
+              de cuatrocientos treinta píxeles fijos deja el mapa medio fuera y
+              obliga a hacer malabares con el pulgar. */}
+          <div className="relative h-[clamp(340px,50vh,440px)]">
             <Suspense
               fallback={
                 <div
@@ -262,7 +267,7 @@ function MapaTab({ store, days }: { store: Store; days: number }) {
               }
             >
               <BodyView3D
-                className="h-[430px] w-full"
+                className="h-full w-full"
                 label={
                   detail
                     ? `Figura giratoria con las porciones del grupo ${MUSCLE_LABEL[detail]} coloreadas por trabajo recibido`
