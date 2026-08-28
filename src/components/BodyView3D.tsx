@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { BODY_HEIGHT, bestYaw, buildFiller, buildParts, buildSkin, type Part, type Vec3 } from '../lib/body3d';
+import { UNTRAINED } from './BodyMap';
 import type { Muscle } from '../lib/types';
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -102,8 +103,6 @@ export type BodyView3DProps = {
    parecen, la figura entera se lee como un maniquí liso y no se distingue
    dónde empieza y acaba cada músculo. */
 const SKIN = '#E4E4DD';
-/** Músculo sin trabajo en el periodo. */
-const UNTRAINED = '#C6C6BD';
 /** Grupo atenuado en el mapa de detalle. */
 const MUTED = '#D2D2CA';
 /** Tejido que la app no mide: antebrazo, tibial. */

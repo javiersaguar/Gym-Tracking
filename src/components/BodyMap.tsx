@@ -49,8 +49,12 @@ export function thermal(t: number): string {
   return hex(last[1]);
 }
 
-/** Gris de lo que no se ha entrenado y de lo que la app no mide. */
-const UNTRAINED = '#D8D8D2';
+/**
+ * Gris de un músculo sin trabajo en el periodo. Lo usan la leyenda y el visor
+ * del cuerpo, y tienen que ser el mismo: si el cuadradito de la leyenda no es
+ * el gris que está pintado en la figura, la leyenda deja de explicarla.
+ */
+export const UNTRAINED = '#C6C6BD';
 
 /**
  * Leyenda de la escala, rotulada como la de un mapa del tiempo: un degradado
