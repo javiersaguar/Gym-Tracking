@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { BODY_HEIGHT, bestYaw, buildParts, buildSkin, type Part, type Vec3 } from '../lib/body3d';
+import { BODY_HEIGHT, bestYaw, buildFiller, buildParts, buildSkin, type Part, type Vec3 } from '../lib/body3d';
 import type { Muscle } from '../lib/types';
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -23,7 +23,11 @@ import type { Muscle } from '../lib/types';
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** Geometría compartida: se genera al primer uso y ya no se vuelve a tocar. */
-let cached: { skin: THREE.BufferGeometry; parts: { part: Part; geometry: THREE.BufferGeometry }[] } | null = null;
+let cached: {
+  skin: THREE.BufferGeometry;
+  filler: THREE.BufferGeometry;
+  parts: { part: Part; geometry: THREE.BufferGeometry }[];
+} | null = null;
 
 function geometryOf(m: {
   positions: Float32Array;
@@ -56,6 +60,7 @@ function body() {
   if (!cached) {
     cached = {
       skin: geometryOf(buildSkin()),
+      filler: geometryOf(buildFiller()),
       parts: buildParts().map((part) => ({ part, geometry: geometryOf(part) })),
     };
   }
@@ -170,7 +175,7 @@ export function BodyView3D({
     const root = new THREE.Group();
     scene.add(root);
 
-    const { skin, parts } = body();
+    const { skin, filler, parts } = body();
     root.add(new THREE.Mesh(skin, new THREE.MeshStandardMaterial({
       color: SKIN,
       roughness: 0.96,
@@ -180,6 +185,13 @@ export function BodyView3D({
       polygonOffset: true,
       polygonOffsetFactor: 2,
       polygonOffsetUnits: 2,
+    })));
+
+    root.add(new THREE.Mesh(filler, new THREE.MeshStandardMaterial({
+      color: UNMEASURED,
+      roughness: 0.82,
+      metalness: 0,
+      vertexColors: true,
     })));
 
     type Item = { part: Part; mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; from: THREE.Color; to: THREE.Color };
@@ -432,9 +444,9 @@ export function BodyView3D({
         for (const it of items) {
           it.mesh.visible = isDetail ? (!it.part.deep || it.part.muscle === nextFocus) : !it.part.deep;
           const dim = isDetail && it.part.muscle !== nextFocus;
-          const c = it.part.muscle && !dim ? fn(it.part.muscle, isDetail ? it.part.head : null) : null;
+          const c = dim ? null : fn(it.part.muscle as Muscle, isDetail ? it.part.head : null);
           it.from.copy(it.mat.color);
-          it.to.set(c ?? (!it.part.muscle ? UNMEASURED : dim ? MUTED : UNTRAINED));
+          it.to.set(c ?? (dim ? MUTED : UNTRAINED));
           /* El grupo elegido se separa del resto con un punto de luz propia,
              que se lee mejor que un borde sobre una superficie curva. */
           it.mat.emissive.set(!isDetail && nextFocus && it.part.muscle === nextFocus ? 0x1a1a22 : 0x000000);
@@ -481,12 +493,10 @@ export function BodyView3D({
   useEffect(() => {
     if (!focus && !faceHead) return;
     const parts = body().parts.map((p) => p.part);
-    const anchor = faceHead
-      ? parts.find((p) => p.head === faceHead && p.center[0] >= 0)
-      : undefined;
+    const anchor = faceHead ? parts.find((p) => p.head === faceHead) : undefined;
     api.current?.spinTo(
       bestYaw(parts, focus ?? null, faceHead),
-      anchor?.muscle ? { point: anchor.center, muscle: anchor.muscle } : undefined,
+      anchor?.muscle ? { point: anchor.anchor, muscle: anchor.muscle } : undefined,
     );
   }, [focus, faceHead]);
 

@@ -49,8 +49,14 @@ export type Part = MeshData & {
   head: string | null;
   /** Músculo tapado por otro: solo se muestra en el mapa de detalle. */
   deep: boolean;
-  /** Punto medio del parche, para colocar la etiqueta y encuadrar la cámara. */
+  /**
+   * Punto medio de la pieza, promediando los dos lados. Al ser simétrica cae
+   * sobre el eje del cuerpo, y por eso sirve para saber por dónde mirarla:
+   * las componentes laterales se anulan y queda solo el «delante o detrás».
+   */
   center: Vec3;
+  /** Centro del lado izquierdo, donde se clava la etiqueta. */
+  anchor: Vec3;
 };
 
 /* ── Vectores ────────────────────────────────────────────────────────────── */
@@ -202,8 +208,18 @@ function makeLimb(points: readonly Vec3[], radii: readonly number[][]): Surface 
 
   const seek = (t: number) => {
     const d = clamp(t, 0, 1) * total;
-    let i = 1;
-    while (i < cum.length - 1 && at(cum, i) < d) i++;
+    /* Búsqueda binaria, no lineal: cada vértice consulta el eje cinco veces
+       —una por el punto y cuatro por la normal— y recorrer los ciento y pico
+       tramos desde el principio cada vez era la mitad del coste de generar la
+       figura entera. */
+    let lo = 1;
+    let hi = cum.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (at(cum, mid) < d) lo = mid + 1;
+      else hi = mid;
+    }
+    const i = lo;
     const a = at(dense, i - 1);
     const b = at(dense, i);
     const seg = at(cum, i) - at(cum, i - 1) || 1;
@@ -550,6 +566,36 @@ function buildPatch(s: Spec, index: number, side: 1 | -1, nu = 9, nv = 12): Part
     head: s.head,
     deep: s.deep ?? false,
     center,
+    anchor: center,
+  };
+}
+
+/**
+ * Une las dos mitades de una pieza en una sola malla.
+ *
+ * Los dos lados de un músculo llevan siempre el mismo color —no se entrena un
+ * bíceps sin el otro en el mapa—, así que no hay razón para dibujarlos por
+ * separado. Juntarlos baja las llamadas de dibujo de ciento quince a poco más
+ * de cuarenta, que en un móvil dentro del gimnasio es la diferencia entre un
+ * giro suave y uno a trompicones.
+ */
+function joinSides(a: Part, b: Part): Part {
+  const merged = merge([a, b]);
+  const shade = new Float32Array(a.shade.length + b.shade.length);
+  shade.set(a.shade, 0);
+  shade.set(b.shade, a.shade.length);
+  return {
+    ...merged,
+    shade,
+    id: a.id.split('#')[0] ?? a.id,
+    muscle: a.muscle,
+    head: a.head,
+    deep: a.deep,
+    /* El centro de los dos lados juntos cae sobre el eje: es lo que hace que
+       el encuadre automático dé «de frente» o «por detrás» y no un ángulo
+       torcido hacia un costado. */
+    center: [0, (a.center[1] + b.center[1]) / 2, (a.center[2] + b.center[2]) / 2],
+    anchor: a.center,
   };
 }
 
@@ -738,9 +784,33 @@ export function buildSkin(): MeshData {
   ]);
 }
 
-/** Todas las piezas musculares, los dos lados. */
+/**
+ * Las piezas que la app colorea: una por recorte, con sus dos lados unidos.
+ * Lo que no se mide —antebrazo, pliegues, huesos— no sale aquí: va en la piel,
+ * porque no cambia nunca de color y no hace falta poder tocarlo.
+ */
 export function buildParts(): Part[] {
-  return SPECS.flatMap((s, i) => (s.single ? [buildPatch(s, i, 1)] : [buildPatch(s, i, 1), buildPatch(s, i, -1)]));
+  return SPECS.filter((s) => s.muscle).map((s, i) =>
+    s.single ? buildPatch(s, i, 1) : joinSides(buildPatch(s, i, 1), buildPatch(s, i, -1)),
+  );
+}
+
+/**
+ * Relleno: las piezas sin músculo, en una sola malla. Llevan su sombra dentro,
+ * así que se dibujan con un único material y una única llamada.
+ */
+export function buildFiller(): MeshData & { shade: Float32Array } {
+  const parts = SPECS.filter((s) => !s.muscle).flatMap((s, i) =>
+    s.single ? [buildPatch(s, i, 1)] : [buildPatch(s, i, 1), buildPatch(s, i, -1)],
+  );
+  const merged = merge(parts);
+  const shade = new Float32Array(parts.reduce((n, p) => n + p.shade.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    shade.set(p.shade, o);
+    o += p.shade.length;
+  }
+  return { ...merged, shade };
 }
 
 /**

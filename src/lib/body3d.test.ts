@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestYaw, buildParts, buildSkin, type Part } from './body3d';
+import { bestYaw, buildFiller, buildParts, buildSkin } from './body3d';
 import { HEADS } from './heads';
 import { MUSCLES } from './types';
 
@@ -27,6 +27,12 @@ function checkMesh(m: { positions: Float32Array; normals: Float32Array; indices:
 describe('malla del cuerpo', () => {
   it('la piel es una malla válida', () => {
     checkMesh(buildSkin(), 'piel');
+  });
+
+  it('el relleno sin músculo es una malla válida', () => {
+    const filler = buildFiller();
+    checkMesh(filler, 'relleno');
+    expect(filler.shade.length, 'una sombra por vértice').toBe(filler.positions.length / 3);
   });
 
   it('cada pieza muscular es una malla válida', () => {
@@ -63,29 +69,31 @@ describe('cobertura de los grupos', () => {
   it('cada grupo aparece en los dos lados del cuerpo', () => {
     for (const m of MUSCLES) {
       const mine = parts.filter((p) => p.muscle === m);
-      expect(mine.some((p) => p.center[0] > 0), `${m}: lado izquierdo`).toBe(true);
-      expect(mine.some((p) => p.center[0] < 0), `${m}: lado derecho`).toBe(true);
+      expect(mine.length, `${m}: tiene piezas`).toBeGreaterThan(0);
+      const xs = mine.flatMap((p) => [...p.positions].filter((_, i) => i % 3 === 0));
+      expect(Math.max(...xs), `${m}: lado izquierdo`).toBeGreaterThan(1);
+      expect(Math.min(...xs), `${m}: lado derecho`).toBeLessThan(-1);
     }
   });
 
-  it('cada pieza o va emparejada con su reflejo o va sobre el eje', () => {
-    const bySpec = new Map<string, Part[]>();
+  it('cada pieza es simétrica: los dos lados van en la misma malla', () => {
     for (const p of parts) {
-      const key = p.id.split('#')[0] ?? '';
-      bySpec.set(key, [...(bySpec.get(key) ?? []), p]);
+      const xs = [...p.positions].filter((_, i) => i % 3 === 0);
+      /* Lo que se dibuja a la izquierda tiene que estar también a la derecha,
+         porque el mapa nunca colorea medio músculo. Las piezas de la línea
+         media cumplen lo mismo por su cuenta. */
+      expect(Math.max(...xs), `${p.id}: simétrica`).toBeCloseTo(-Math.min(...xs), 3);
+      expect(Math.abs(p.center[0]), `${p.id}: centro sobre el eje`).toBeLessThan(0.001);
+      expect(p.shade.length, `${p.id}: una sombra por vértice`).toBe(p.positions.length / 3);
     }
-    for (const [key, list] of bySpec) {
-      if (list.length === 1) {
-        /* Las piezas únicas son las de la línea media: la línea alba, el
-           esternón, el canal de la columna y el pliegue interglúteo. */
-        expect(Math.abs(list[0]?.center[0] ?? 99), `${key}: centrada en el eje`).toBeLessThan(0.5);
-        continue;
-      }
-      expect(list.length, `${key}: par`).toBe(2);
-      const [a, b] = list as [Part, Part];
-      expect(a.center[0], `${key}: lados opuestos`).toBeCloseTo(-b.center[0], 4);
-      expect(a.center[1], `${key}: misma altura`).toBeCloseTo(b.center[1], 4);
-      expect(a.positions.length, `${key}: misma malla`).toBe(b.positions.length);
+  });
+
+  it('el ancla de la etiqueta cae sobre el lado izquierdo, no en el eje', () => {
+    /* Si el ancla se quedara en el centro, el cartel de un bíceps saldría
+       flotando en medio del tronco. */
+    for (const p of parts) {
+      if (Math.max(...[...p.positions].filter((_, i) => i % 3 === 0)) < 3) continue;
+      expect(p.anchor[0], `${p.id}: ancla lateral`).toBeGreaterThan(0);
     }
   });
 });
