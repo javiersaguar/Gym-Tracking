@@ -381,7 +381,9 @@ const TORSO_RINGS: number[][] = [
 ];
 
 /* La cabeza es otro perfil de secciones: así tiene mandíbula y occipucio en
-   vez de ser una bola, que es lo que delata a un muñeco de juguete. */
+   vez de ser una bola. Va sin cara a propósito: es la convención de las
+   figuras anatómicas, y el intento de ponerle nariz, ceja y mentón quedaba
+   como un robot, peor que el óvalo limpio. */
 const HEAD_RINGS: number[][] = [
   [156, 3.6, 4.6, 4.6],
   [159, 5.6, 7.2, 6.8],
