@@ -94,8 +94,26 @@ let state: Store = read();
 const listeners = new Set<() => void>();
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 
+/* ── Modo demo ───────────────────────────────────────────────────────────── */
+
+/**
+ * Almacén de ejemplo, cuando está puesto.
+ *
+ * Vive solo en memoria y nunca se escribe: el modo demo no puede tocar los
+ * datos reales, ni siquiera si dentro del ejemplo se apunta un entreno. Los
+ * datos de verdad se quedan intactos en su sitio, y al recargar la página el
+ * ejemplo desaparece solo.
+ */
+let demo: Store | null = null;
+
+export function isDemo(): boolean {
+  return demo != null;
+}
+
 function flush() {
   writeTimer = null;
+  /* Nada de lo que pase dentro del ejemplo llega al disco. */
+  if (demo) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
@@ -111,7 +129,27 @@ function persist() {
 }
 
 export function getStore(): Store {
-  return state;
+  return demo ?? state;
+}
+
+function notify() {
+  for (const l of listeners) l();
+}
+
+/**
+ * Entra en el modo demo. Construye el ejemplo al vuelo —no ocupa sitio
+ * guardado— y deja los datos reales donde estaban.
+ */
+export function enterDemo(build: () => Store): void {
+  if (writeTimer) flush();
+  demo = build();
+  notify();
+}
+
+export function exitDemo(): void {
+  if (!demo) return;
+  demo = null;
+  notify();
 }
 
 export function subscribe(fn: () => void): () => void {
@@ -120,9 +158,16 @@ export function subscribe(fn: () => void): () => void {
 }
 
 export function update(fn: (s: Store) => Store): void {
+  if (demo) {
+    /* Dentro del ejemplo se puede trastear —empezar un entreno, apuntar
+       series— y nada de eso sale de la memoria. */
+    demo = fn(demo);
+    notify();
+    return;
+  }
   state = fn(state);
   persist();
-  for (const l of listeners) l();
+  notify();
 }
 
 /** Fuerza el guardado inmediato. Se llama al cerrar u ocultar la pestaña. */
@@ -141,17 +186,18 @@ if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     if (e.key !== KEY || !e.newValue) return;
     state = read();
-    for (const l of listeners) l();
+    if (!demo) notify();
   });
 }
 
 /* ── Importar / exportar ─────────────────────────────────────────────────── */
 
 export function exportJson(): string {
-  return JSON.stringify(state, null, 2);
+  return JSON.stringify(getStore(), null, 2);
 }
 
 export function importJson(raw: string): { ok: true } | { ok: false; error: string } {
+  if (demo) return { ok: false, error: 'Sal del modo demo antes de importar una copia.' };
   let parsed: Partial<Store>;
   try {
     parsed = JSON.parse(raw) as Partial<Store>;
@@ -166,6 +212,9 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
 }
 
 export function resetAll(): void {
+  /* Borrar mientras se mira el ejemplo borraría los datos de verdad sin que
+     se estén viendo, que es la peor forma posible de perder un histórico. */
+  if (demo) return;
   update(() => emptyStore());
   flushNow();
 }
@@ -216,11 +265,13 @@ export async function storageInfo(): Promise<{ persisted: boolean; usedKB: numbe
 }
 
 /** Cuántas sesiones se han guardado desde la última copia descargada. */
-export function sessionsSinceBackup(s: Store = state): number {
+export function sessionsSinceBackup(s: Store = getStore()): number {
+  if (demo) return 0;
   return Math.max(0, s.sessions.length - s.settings.lastBackupCount);
 }
 
 export function markBackedUp(): void {
+  if (demo) return;
   update((s) => ({ ...s, settings: { ...s.settings, lastBackupCount: s.sessions.length } }));
   flushNow();
 }

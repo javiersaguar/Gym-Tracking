@@ -1,7 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { restoreDemo } from './lib/demo';
 import './index.css';
+
+/* Antes del primer pintado: si se estaba viendo el ejemplo y se ha recargado,
+   volver a ponerlo sin que se asome la app vacía por el camino. */
+restoreDemo();
 
 const root = document.getElementById('root');
 if (root) createRoot(root).render(<StrictMode><App /></StrictMode>);

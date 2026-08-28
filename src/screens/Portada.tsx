@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { Wordmark } from '../components/Wordmark';
 import { Button, cx } from '../components/ui';
 import { cycleState } from '../lib/actions';
+import { startDemo, stopDemo } from '../lib/demo';
+import { isDemo } from '../lib/storage';
 import { duration, longDate, plural, relativeDay, tonnage } from '../lib/format';
 import { haptic } from '../lib/hooks';
 import { sessionStats } from '../lib/metrics';
@@ -147,6 +149,42 @@ export function Portada({
           ))}
         </nav>
       </main>
+
+      {/* Abajo del todo, apartado del camino normal: una app de seguimiento
+          vacía no se puede juzgar —el mapa sale gris y las gráficas sin
+          línea—, así que hay una forma de verla llena antes de tener datos
+          propios. Los de verdad no se tocan: el ejemplo vive en memoria. */}
+      <section className="mt-16 border-t border-line pt-5" style={{ '--i': 5 } as React.CSSProperties}>
+        {isDemo() ? (
+          <>
+            <p className="text-caption text-ink-muted">
+              Estás viendo un histórico de ejemplo de catorce semanas. Tus datos siguen guardados y sin tocar.
+            </p>
+            <Button className="mt-3" variant="quiet" onClick={() => stopDemo()}>
+              Salir del ejemplo
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-caption text-ink-muted">
+              ¿Quieres ver cómo queda con datos? Carga un histórico de ejemplo y recórrelo entero: mapa
+              muscular, gráficas de fuerza, récords y registro. No se guarda nada.
+            </p>
+            <Button
+              className="mt-3"
+              variant="quiet"
+              onClick={() => {
+                haptic();
+                startDemo();
+                onNavigate('/progreso');
+              }}
+            >
+              Ver la app con datos de ejemplo
+              <Arrow />
+            </Button>
+          </>
+        )}
+      </section>
 
       <footer className="mt-14 flex items-baseline justify-between gap-4 border-t border-line pb-6 pt-4">
         <span className="label">Últimos 7 días</span>

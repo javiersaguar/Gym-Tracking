@@ -500,6 +500,34 @@ export function OriginPanel({
  * la pantalla. No se recarga sola a propósito — hacerlo a mitad de un entreno
  * sería perder el hilo justo cuando menos apetece.
  */
+/**
+ * Aviso permanente mientras se mira el ejemplo.
+ *
+ * Va en todas las pantallas, no solo en la portada: si uno entra al ejemplo,
+ * se pone a mirar el mapa y luego el registro, tiene que quedarle claro en
+ * todo momento que esos entrenos no son suyos, y poder salir sin buscar.
+ */
+export function DemoBanner({ active, onExit }: { active: boolean; onExit: () => void }) {
+  if (!active) return null;
+  return (
+    /* Va en el flujo y pegajoso, no flotando: un aviso permanente que tapa el
+       texto de debajo estorba en cada pantalla, y este se queda puesto todo el
+       rato que dure el ejemplo. */
+    <div className="chrome sticky top-0 z-40 -mx-6 mb-4 flex items-center gap-3 border-b border-accent/25 bg-accent-wash px-6 py-2">
+      <span className="min-w-0 flex-1 text-caption text-ink">
+        <span className="font-medium">Datos de ejemplo.</span>{' '}
+        <span className="text-ink-muted">Los tuyos siguen guardados.</span>
+      </span>
+      <button
+        onClick={onExit}
+        className="pressable shrink-0 rounded-md px-2 py-1 text-caption font-medium text-accent transition-colors duration-press hover:bg-paper"
+      >
+        Salir
+      </button>
+    </div>
+  );
+}
+
 export function UpdateBanner() {
   const [apply, setApply] = useState<(() => void) | null>(null);
 

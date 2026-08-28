@@ -43,6 +43,12 @@ no hay servidor, ni cuenta, ni red que se pueda caer a mitad de una serie.
     repetición** (mejor peso a 5, a 8, a 10…) de cada ejercicio.
   - **Descanso** — nube de puntos de descanso frente a rendimiento con la curva del modelo encima,
     para comprobar con tus propios datos si la fórmula te describe.
+- **Datos de ejemplo.** Abajo del todo en la portada hay un botón que carga un histórico de catorce
+  semanas para poder recorrer la app llena antes de tener datos propios: el mapa coloreado, las
+  gráficas con forma, los récords y el registro. Está construido para enseñar lo que la app sabe
+  hacer —progresión que se aplana, una semana de descarga, dos semanas con el gimnasio lleno y los
+  descansos disparados, y un par de grupos desatendidos para que el mapa no salga todo verde—. El
+  ejemplo vive solo en memoria: **no toca tus datos**, no se guarda, y se acaba al cerrar la pestaña.
 - **Registro completo.** Cada entreno desplegable serie a serie: ejercicio, peso, repeticiones, RIR y
   el descanso que precedió a cada una. Exportable a CSV.
 
@@ -151,7 +157,7 @@ una copia descargable en JSON y su restauración.
 ```bash
 npm install
 npm run dev        # servidor de desarrollo
-npm test           # 127 pruebas: algoritmo, reparto por porciones y malla del cuerpo
+npm test           # 145 pruebas: algoritmo, porciones, malla del cuerpo y modo demo
 npm run build      # build de producción + service worker
 npm run preview    # sirve el build, con el modo sin conexión activo
 npm run icons      # regenera los PNG del icono a partir de public/icon.svg
@@ -180,6 +186,7 @@ src/
     headState.ts   Lo mismo por porción, la que colorea el mapa de detalle
     heads.ts       Catálogo de porciones y reparto de cada ejercicio entre ellas
     body3d.ts      La figura: superficies del cuerpo y recorte de cada músculo
+    demo.ts        Genera el histórico de ejemplo y enciende y apaga el modo demo
     csv.ts         Exportación e importación del registro, fila por serie
   screens/         Portada · Hoy · Entreno · Resumen · Progreso · Registro · Historial · Rutina · Ajustes
 scripts/

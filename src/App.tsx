@@ -1,9 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useState } from 'react';
 import { BottomNav, TopBar } from './components/BottomNav';
-import { Button, Empty, Toast, UpdateBanner } from './components/ui';
+import { Button, DemoBanner, Empty, Toast, UpdateBanner } from './components/ui';
 import { startSession } from './lib/actions';
 import { useRoute, useStore } from './lib/hooks';
+import { stopDemo } from './lib/demo';
+import { isDemo } from './lib/storage';
 import { Ajustes } from './screens/Ajustes';
 import { Entreno } from './screens/Entreno';
 import { Historial } from './screens/Historial';
@@ -147,6 +149,7 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-[100dvh] max-w-lg px-6 pb-24">
+      <DemoBanner active={isDemo()} onExit={stopDemo} />
       {!bare && <TopBar onHome={goHome} title={TITLES[path] ?? (sessionMatch ? 'Análisis' : undefined)} />}
 
       <AnimatePresence mode="wait" initial={false}>
