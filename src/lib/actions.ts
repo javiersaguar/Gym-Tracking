@@ -155,6 +155,42 @@ export function setRir(exIdx: number, setIdx: number, rir: number | null): void 
   patchSet(exIdx, setIdx, { rir });
 }
 
+export function setPartials(exIdx: number, setIdx: number, partials: number): void {
+  patchSet(exIdx, setIdx, { partials: partials > 0 ? partials : null });
+}
+
+/**
+ * Corrige a mano el descanso previo a una serie.
+ *
+ * El cronómetro es lo cómodo cuando uno se acuerda de darle, pero olvidarse es
+ * lo normal, y un descanso mal apuntado no es un hueco: el algoritmo lo usa
+ * para separar la mejora real del efecto del descanso. Poder escribirlo
+ * después es lo que evita que una sesión entera quede mal medida.
+ */
+export function setRest(exIdx: number, setIdx: number, seconds: number | null): void {
+  patchSet(exIdx, setIdx, { restSec: seconds == null ? null : Math.max(0, Math.round(seconds)) });
+}
+
+/** Empieza o deja de apuntar el ejercicio lado a lado. */
+export function setPerSide(exIdx: number, perSide: boolean): void {
+  withActive((a) =>
+    mapExercise(a, exIdx, (e) => ({
+      ...e,
+      perSide,
+      sets: perSide
+        ? /* Al empezar a apuntar por lados, las series que aún no se han
+             marcado copian el lado izquierdo en el derecho: lo normal es haber
+             hecho lo mismo con los dos brazos, y así solo hay que corregir lo
+             que se salga. Las ya marcadas no se tocan: doblarles el tonelaje a
+             posteriori sería reescribir lo apuntado. */
+          e.sets.map((x) => (x.done || x.right ? x : { ...x, right: { weight: x.weight, reps: x.reps } }))
+        : /* Al dejar de apuntarlos, el lado derecho se borra: dejarlo escondido
+             seguiría sumando al tonelaje sin que se vea. */
+          e.sets.map((x) => ({ ...x, right: null })),
+    })),
+  );
+}
+
 export function uncompleteSet(exIdx: number, setIdx: number): void {
   patchSet(exIdx, setIdx, { done: false, at: 0 });
 }

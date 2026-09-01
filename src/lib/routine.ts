@@ -15,6 +15,8 @@ type Spec = {
   reps: [number, number];
   load?: 'peso' | 'corporal';
   notes?: string;
+  /** Se hace un lado cada vez: la app ofrece apuntar los dos por separado. */
+  unilateral?: boolean;
 };
 
 const CATALOG = {
@@ -44,11 +46,13 @@ const CATALOG = {
     muscles: [['espalda', 0.85], ['biceps', 0.15]],
     reps: [7, 11],
     notes: 'El peso es por lado.',
+    unilateral: true,
   },
   'pull-over': {
     name: 'Pull over',
     muscles: [['espalda', 0.85], ['triceps', 0.15]],
     reps: [8, 12],
+    unilateral: true,
   },
   'hombro-posterior': {
     name: 'Hombro posterior',
@@ -105,6 +109,7 @@ const CATALOG = {
     name: 'Extensión de tríceps',
     muscles: [['triceps', 1]],
     reps: [8, 12],
+    unilateral: true,
   },
   'triceps-nuca': {
     name: 'Tríceps tras nuca',
@@ -161,6 +166,15 @@ export const CATALOG_IDS = Object.keys(CATALOG) as CatalogId[];
 
 export function catalogName(id: string): string {
   return (CATALOG as Record<string, Spec>)[id]?.name ?? id;
+}
+
+/**
+ * Si el ejercicio se hace un lado cada vez. Es solo el valor por defecto: en
+ * el entreno se puede activar o desactivar para cualquier ejercicio, porque
+ * un día suelto se hace a un brazo lo que normalmente va a dos.
+ */
+export function isUnilateral(id: string): boolean {
+  return (CATALOG as Record<string, Spec>)[id]?.unilateral === true;
 }
 
 /** Construye un ejercicio de la rutina a partir del catálogo. */

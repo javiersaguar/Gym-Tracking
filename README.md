@@ -22,6 +22,18 @@ no hay servidor, ni cuenta, ni red que se pueda caer a mitad de una serie.
 - **RIR en cada serie.** Un toque para apuntar cuántas repeticiones te quedaban, con la pregunta
   escrita entera al lado. Es lo que separa «7 y podía con dos más» de «7 y me morí», y lo que permite
   saber si una sesión floja fue falta de fuerza o falta de ganas.
+- **Ejercicios a un brazo, con cada lado por su cuenta.** La gironda, el pull over y la extensión de
+  tríceps vienen ya así; cualquier otro se puede cambiar en el propio entreno, porque un día suelto se
+  hace a un brazo lo que normalmente va a dos. Cada lado lleva su peso y sus repeticiones, el tonelaje
+  suma los dos y los récords los firma el lado que los haya hecho.
+- **Repeticiones parciales, además del RIR.** Son la otra mitad de la misma pregunta —cómo acabó la
+  serie—, así que van en la misma tarjeta. Cuentan media repetición en el tonelaje y **no** entran en el
+  1RM estimado: un recorrido a medias mueve trabajo, pero no demuestra fuerza en el rango completo.
+- **El descanso se puede corregir a mano**, tocando el propio rótulo. Olvidarse del cronómetro es lo
+  normal, y un descanso mal apuntado no deja un hueco inocente: es lo que el algoritmo usa para separar
+  la mejora real del efecto del descanso, así que una cifra mala tuerce la lectura de la sesión entera.
+  También se apunta y se ve el **descanso entre ejercicios**, que es el que más varía porque incluye
+  esperar a que se libere la máquina.
 - **El descanso se queda escrito entre serie y serie.** Al parar el cronómetro, el tiempo medido
   aparece justo donde ocurrió y se queda ahí: al mirar la tarjeta después se ve el ritmo real del
   ejercicio sin abrir nada.
@@ -157,7 +169,7 @@ una copia descargable en JSON y su restauración.
 ```bash
 npm install
 npm run dev        # servidor de desarrollo
-npm test           # 145 pruebas: algoritmo, porciones, malla del cuerpo y modo demo
+npm test           # 160 pruebas: algoritmo, porciones, malla del cuerpo, demo y lados
 npm run build      # build de producción + service worker
 npm run preview    # sirve el build, con el modo sin conexión activo
 npm run icons      # regenera los PNG del icono a partir de public/icon.svg

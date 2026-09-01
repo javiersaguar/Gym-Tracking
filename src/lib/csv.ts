@@ -1,5 +1,5 @@
 import { clock } from './format';
-import { isFilled } from './metrics';
+import { isFilled, setTonnage } from './metrics';
 import { uid } from './actions';
 import type { LoggedExercise, Session, Store } from './types';
 
@@ -26,7 +26,12 @@ const COLUMNS = [
   'serie',
   'peso_kg',
   'repeticiones',
+  /* Lado derecho de un ejercicio unilateral. Vacío cuando la serie se apuntó
+     a la vez con los dos, que es como sigue estando casi todo el histórico. */
+  'peso_der_kg',
+  'repeticiones_der',
   'rir',
+  'parciales',
   'descanso_seg',
   'descanso',
   'tonelaje_kg',
@@ -71,10 +76,13 @@ export function toCsv(sessions: Session[]): string {
             i + 1,
             set.weight,
             set.reps,
+            set.right?.weight ?? '',
+            set.right?.reps ?? '',
             set.rir ?? '',
+            set.partials ?? '',
             set.restSec ?? '',
             set.restSec != null ? clock(set.restSec) : '',
-            Math.round(set.weight * set.reps),
+            Math.round(setTonnage(set)),
             s.feel ?? '',
             esc(s.note),
           ].join(SEP),
@@ -191,11 +199,17 @@ export function fromCsv(text: string): { ok: true; data: CsvImport } | { ok: fal
     }
 
     const at = start;
+    const rightW = optNum(get('peso_der_kg'));
+    const rightR = optNum(get('repeticiones_der'));
     ex.sets.push({
       id: uid(),
       weight: num(get('peso_kg')),
       reps: num(get('repeticiones')),
+      /* El lado derecho solo entra si el CSV lo trae: un archivo viejo no
+         tiene esas columnas y no hay que inventárselas. */
+      ...(rightW != null && rightR != null ? { right: { weight: rightW, reps: rightR } } : {}),
       rir: optNum(get('rir')),
+      partials: optNum(get('parciales')),
       restSec: optNum(get('descanso_seg')),
       at,
       done: true,

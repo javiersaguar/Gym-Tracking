@@ -188,8 +188,20 @@ function SessionEntry({
                         {done.map((set, n) => (
                           <tr key={set.id} className="border-t border-line-soft">
                             <td className="py-1 text-ink-faint">{n + 1}</td>
-                            <td className="py-1">{kg(set.weight)} kg</td>
-                            <td className="py-1">{set.reps}</td>
+                            <td className="py-1">
+                              {kg(set.weight)}
+                              {set.right && ` / ${kg(set.right.weight)}`} kg
+                            </td>
+                            <td className="py-1">
+                              {set.reps}
+                              {set.right && ` / ${set.right.reps}`}
+                              {/* Las parciales van pegadas a las repeticiones,
+                                  que es donde se leen: «8+2» es ocho completas
+                                  y dos a medias, no diez. */}
+                              {(set.partials ?? 0) > 0 && (
+                                <span className="text-ink-faint"> +{set.partials}</span>
+                              )}
+                            </td>
                             <td className="py-1 text-ink-muted">{set.rir ?? '—'}</td>
                             <td className="py-1 text-right text-ink-muted">
                               {set.restSec != null ? clock(set.restSec) : '—'}

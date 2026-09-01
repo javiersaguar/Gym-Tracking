@@ -70,11 +70,28 @@ export type Routine = {
   days: Day[];
 };
 
+/** Lo hecho con un lado en un ejercicio unilateral. */
+export type SideEntry = { weight: number; reps: number };
+
 /** Una serie ya registrada dentro de una sesión. */
 export type LoggedSet = {
   id: string;
+  /** En un ejercicio por lados, el lado izquierdo. */
   weight: number;
   reps: number;
+  /**
+   * Lado derecho, cuando el ejercicio se apunta por lados y los dos no son
+   * iguales. Ausente significa que solo hay una entrada, ni más ni menos: no
+   * se supone que el otro lado hizo lo mismo, porque eso reescribiría el
+   * tonelaje de todo lo apuntado hasta ahora.
+   */
+  right?: SideEntry | null;
+  /**
+   * Repeticiones parciales hechas después de la última completa. Cuentan como
+   * media repetición en el tonelaje y no entran en el 1RM estimado: un recorrido
+   * a medias mueve trabajo, pero no demuestra fuerza en el rango completo.
+   */
+  partials?: number | null;
   /**
    * Descanso real medido antes de esta serie, en segundos.
    *
@@ -106,6 +123,12 @@ export type LoggedExercise = {
   sets: LoggedSet[];
   /** Quitado del entreno de hoy sin tocar la rutina. */
   skipped: boolean;
+  /**
+   * Apuntar cada lado por separado. Sin valor, manda lo que diga el catálogo
+   * para ese ejercicio; puesto a mano, gana sobre el catálogo, porque cualquier
+   * ejercicio se puede hacer a un brazo un día suelto.
+   */
+  perSide?: boolean;
 };
 
 export type Session = {

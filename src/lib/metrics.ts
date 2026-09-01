@@ -101,7 +101,12 @@ export function e1RMCapacity(weight: number, reps: number, rir: number | null): 
  * verdad manda, y allí se descuenta.
  */
 export function demonstratedCapacity(set: LoggedSet): number {
-  return e1RMCapacity(set.weight, set.reps, set.rir);
+  /* Por lados, la capacidad es la del lado que más demostró: es lo que se ha
+     probado que se puede hacer, no el promedio de los dos brazos. */
+  return Math.max(
+    e1RMCapacity(set.weight, set.reps, set.rir),
+    set.right ? e1RMCapacity(set.right.weight, set.right.reps, set.rir) : 0,
+  );
 }
 
 /**
@@ -122,9 +127,49 @@ export function fatigueLimited(rir: number | null): number {
   return (4 - rir) / 3;
 }
 
-export function isFilled(s: LoggedSet): boolean {
-  return s.done && s.reps > 0;
+/* ── Qué vale una serie ──────────────────────────────────────────────────── */
+
+/**
+ * Cuánto cuenta una repetición parcial. Media: mueve trabajo de verdad, pero
+ * no el mismo que un recorrido completo, y contarla entera premiaría acortar
+ * el rango.
+ */
+export const PARTIAL_WEIGHT = 0.5;
+
+/**
+ * Repeticiones completas de una serie, sumando el segundo lado si se apuntó.
+ *
+ * Un lado ausente no se supone igual al otro: se cuenta lo que hay escrito y
+ * nada más. Suponerlo doblaría de golpe el histórico de los unilaterales ya
+ * apuntados, y un histórico no se reescribe solo.
+ */
+export function setReps(s: LoggedSet): number {
+  return s.reps + (s.right?.reps ?? 0);
 }
+
+/** Tonelaje de una serie: los dos lados, y las parciales a media repetición. */
+export function setTonnage(s: LoggedSet): number {
+  const full = s.weight * s.reps + (s.right ? s.right.weight * s.right.reps : 0);
+  const partials = (s.partials ?? 0) * PARTIAL_WEIGHT;
+  return full + s.weight * partials + (s.right ? s.right.weight * partials : 0);
+}
+
+/** El peso más alto de la serie, mire el lado que mire. */
+export function setHeaviest(s: LoggedSet): number {
+  return Math.max(s.weight, s.right?.weight ?? 0);
+}
+
+/** El mejor 1RM estimado de la serie: el lado que más demostró. */
+export function setE1RM(s: LoggedSet): number {
+  return Math.max(e1RM(s.weight, s.reps), s.right ? e1RM(s.right.weight, s.right.reps) : 0);
+}
+
+export function isFilled(s: LoggedSet): boolean {
+  /* Vale con que haya repeticiones en algún lado: una serie apuntada solo con
+     el brazo derecho es una serie hecha. */
+  return s.done && setReps(s) > 0;
+}
+
 
 /* ── Estadísticas por ejercicio ──────────────────────────────────────────── */
 
@@ -165,11 +210,11 @@ export function exerciseStats(ex: LoggedExercise): ExerciseStats {
   const rests: (number | null)[] = [];
 
   done.forEach((s, i) => {
-    tonnage += s.weight * s.reps;
-    reps += s.reps;
-    heaviest = Math.max(heaviest, s.weight);
+    tonnage += setTonnage(s);
+    reps += setReps(s);
+    heaviest = Math.max(heaviest, setHeaviest(s));
 
-    const est = e1RM(s.weight, s.reps);
+    const est = setE1RM(s);
     if (est > topE1RM) {
       topE1RM = est;
       topSet = s;
@@ -177,7 +222,7 @@ export function exerciseStats(ex: LoggedExercise): ExerciseStats {
     capacity = Math.max(capacity, demonstratedCapacity(s));
     expectedSum += expectedPerformance(i, s.restSec);
 
-    timeSec += workSeconds(s.reps) + (s.restSec ?? 0);
+    timeSec += workSeconds(setReps(s)) + (s.restSec ?? 0);
     rests.push(s.restSec);
     if (s.restSec != null) restsMeasured.push(s.restSec);
     if (s.rir != null) rirs.push(s.rir);
@@ -564,7 +609,11 @@ export function personalBests(
   for (const s of sessions) {
     for (const ex of s.exercises) {
       for (const set of ex.sets) {
-        if (isFilled(set)) offer(ex.exerciseId, set.weight, set.reps, set.at);
+        if (!isFilled(set)) continue;
+        /* Los dos lados compiten por el récord: una marca con el brazo
+           derecho es una marca. */
+        offer(ex.exerciseId, set.weight, set.reps, set.at);
+        if (set.right) offer(ex.exerciseId, set.right.weight, set.right.reps, set.at);
       }
     }
   }
@@ -612,15 +661,20 @@ export function repMaxTable(sessions: Session[], exerciseId: string): RepRecord[
       if (ex.exerciseId !== exerciseId) continue;
       for (const set of ex.sets) {
         if (!isFilled(set)) continue;
-        const prev = best.get(set.reps);
-        if (!prev || set.weight > prev.weight) {
-          best.set(set.reps, {
-            reps: set.reps,
-            weight: set.weight,
-            at: set.at || s.start,
-            rir: set.rir,
-            e1rm: e1RM(set.weight, set.reps),
-          });
+        /* Cada lado se mide por su cuenta: la tabla es «el mejor peso a N
+           repeticiones», y eso lo puede firmar cualquiera de los dos brazos. */
+        for (const side of [set, ...(set.right ? [set.right] : [])]) {
+          if (side.reps <= 0) continue;
+          const prev = best.get(side.reps);
+          if (!prev || side.weight > prev.weight) {
+            best.set(side.reps, {
+              reps: side.reps,
+              weight: side.weight,
+              at: set.at || s.start,
+              rir: set.rir,
+              e1rm: e1RM(side.weight, side.reps),
+            });
+          }
         }
       }
     }

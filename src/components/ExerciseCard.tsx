@@ -1,12 +1,23 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
-import { addSet, patchSet, removeSet, setRir, toggleSkip, uncompleteSet } from '../lib/actions';
+import {
+  addSet,
+  patchSet,
+  removeSet,
+  setPartials,
+  setPerSide,
+  setRest,
+  setRir,
+  toggleSkip,
+  uncompleteSet,
+} from '../lib/actions';
 import { clock } from '../lib/format';
 import { haptic } from '../lib/hooks';
-import { e1RM } from '../lib/metrics';
+import { e1RM, setReps } from '../lib/metrics';
+import { isUnilateral } from '../lib/routine';
 import type { Reference } from '../lib/reference';
 import { referenceLabel } from '../lib/reference';
-import { MUSCLE_LABEL, type LoggedExercise, type LoggedSet } from '../lib/types';
+import { MUSCLE_LABEL, type LoggedExercise, type LoggedSet, type SideEntry } from '../lib/types';
 import { NumberField } from './NumberField';
 import { Button, Pill, cx } from './ui';
 
@@ -60,10 +71,14 @@ function RirPicker({
   value,
   onPick,
   setNumber,
+  partials,
+  onPartials,
 }: {
   value: number | null;
   onPick: (v: number | null) => void;
   setNumber: number;
+  partials: number | null | undefined;
+  onPartials: (v: number) => void;
 }) {
   return (
     <div className="mt-2 rounded-lg border border-line bg-canvas px-2.5 py-2">
@@ -102,6 +117,49 @@ function RirPicker({
           );
         })}
       </div>
+
+      {/* Las parciales van aquí y no en otra tarjeta: son la otra mitad de la
+          misma pregunta —cómo acabó la serie—, y separarlas obligaría a mirar
+          en dos sitios para saberlo. Cuentan media repetición en el tonelaje y
+          no entran en el 1RM: mueven trabajo, pero no demuestran fuerza en el
+          recorrido completo. */}
+      <div className="mt-2 border-t border-line pt-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-micro text-ink-muted">
+            Parciales <span className="text-ink-faint">· tras la última completa</span>
+          </span>
+          {(partials ?? 0) > 0 && <span className="tnum text-micro font-medium text-accent">{partials}</span>}
+        </div>
+        <div
+          className="mt-1.5 flex gap-1"
+          role="group"
+          aria-label={`Repeticiones parciales de la serie ${setNumber}`}
+        >
+          {[0, 1, 2, 3, 4, 5].map((n) => {
+            const active = (partials ?? 0) === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                aria-pressed={active}
+                aria-label={n === 0 ? 'Sin repeticiones parciales' : `${n} repeticiones parciales`}
+                onClick={() => {
+                  haptic(8);
+                  onPartials(n);
+                }}
+                className={cx(
+                  'pressable h-8 flex-1 rounded-md border text-caption font-medium transition-colors duration-press',
+                  active
+                    ? 'border-accent bg-accent text-paper'
+                    : 'border-line bg-paper text-ink-muted hover:border-accent/40 hover:text-ink',
+                )}
+              >
+                {n === 0 ? '–' : n}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -114,8 +172,86 @@ function RirPicker({
  * píxeles y una curva larga, que es movimiento suficiente para que se note
  * que ha aparecido algo sin robar la atención.
  */
-function RestDivider({ seconds }: { seconds: number }) {
-  const long = seconds >= 300;
+function Clock({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={cx('h-3 w-3', className)} fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="10" cy="11" r="6" />
+      <path d="M10 8.2V11l1.8 1.1M8.2 3h3.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * El descanso escrito entre dos series, y editable.
+ *
+ * El cronómetro es lo cómodo cuando uno se acuerda de darle; olvidarse es lo
+ * normal. Y un descanso mal apuntado no deja un hueco inocente: es lo que el
+ * algoritmo usa para separar la mejora real del efecto del descanso, así que
+ * una sola cifra mala tuerce la lectura de la sesión entera. Se toca y se
+ * escribe en minutos y segundos.
+ *
+ * Antes de la primera serie de un ejercicio es el descanso entre ejercicios,
+ * que es el que más varía —incluye esperar a que se libere la máquina— y por
+ * eso lleva su propia etiqueta en vez de pasar desapercibido.
+ */
+function RestDivider({
+  seconds,
+  label,
+  onChange,
+}: {
+  seconds: number | null;
+  label?: string;
+  onChange: (next: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const long = seconds != null && seconds >= 300;
+
+  if (editing) {
+    const mins = Math.floor((seconds ?? 0) / 60);
+    const secs = (seconds ?? 0) % 60;
+    return (
+      <div className="my-1.5 rounded-lg border border-line bg-canvas px-2.5 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-micro text-ink-muted">
+            Descanso <span className="text-ink-faint">· {label ?? 'entre series'}</span>
+          </span>
+          <button
+            onClick={() => setEditing(false)}
+            className="pressable rounded-md px-2 py-0.5 text-micro font-medium text-accent transition-colors duration-press hover:bg-accent-wash"
+          >
+            Listo
+          </button>
+        </div>
+        <div className="mt-1.5 flex items-end gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="label mb-1 block text-center">min</span>
+            <NumberField
+              noun="minutos de descanso"
+              context={label ?? 'entre series'}
+              value={mins}
+              onChange={(v) => onChange(v * 60 + secs)}
+              step={1}
+              max={60}
+              decimals={0}
+            />
+          </label>
+          <label className="min-w-0 flex-1">
+            <span className="label mb-1 block text-center">seg</span>
+            <NumberField
+              noun="segundos de descanso"
+              context={label ?? 'entre series'}
+              value={secs}
+              onChange={(v) => onChange(mins * 60 + Math.min(59, v))}
+              step={5}
+              max={59}
+              decimals={0}
+            />
+          </label>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       layout
@@ -126,18 +262,25 @@ function RestDivider({ seconds }: { seconds: number }) {
       className="flex items-center gap-2 px-1 py-1.5"
     >
       <span className="h-px flex-1 bg-line" />
-      <span
+      <button
+        onClick={() => {
+          haptic(8);
+          setEditing(true);
+        }}
+        aria-label={seconds == null ? `Apuntar el descanso ${label ?? 'entre series'}` : `Corregir el descanso de ${clock(seconds)}`}
         className={cx(
-          'tnum inline-flex items-center gap-1 rounded-full border px-2 py-[3px] text-micro font-medium',
-          long ? 'border-warn-ink/25 bg-warn-wash text-warn-ink' : 'border-line bg-canvas text-ink-muted',
+          'tnum pressable inline-flex items-center gap-1 rounded-full border px-2 py-[3px] text-micro font-medium transition-colors duration-press',
+          seconds == null
+            ? 'border-dashed border-line-strong bg-canvas text-ink-faint hover:text-ink'
+            : long
+              ? 'border-warn-ink/25 bg-warn-wash text-warn-ink'
+              : 'border-line bg-canvas text-ink-muted hover:border-line-strong hover:text-ink',
         )}
       >
-        <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <circle cx="10" cy="11" r="6" />
-          <path d="M10 8.2V11l1.8 1.1M8.2 3h3.6" strokeLinecap="round" />
-        </svg>
-        {clock(seconds)}
-      </span>
+        <Clock />
+        {label && <span className="font-normal">{label}</span>}
+        {seconds == null ? 'apuntar descanso' : clock(seconds)}
+      </button>
       <span className="h-px flex-1 bg-line" />
     </motion.div>
   );
@@ -151,6 +294,7 @@ function SetRow({
   reference,
   weightStep,
   isPr,
+  perSide,
   onDone,
   rowRef,
 }: {
@@ -161,6 +305,7 @@ function SetRow({
   reference: Reference | null;
   weightStep: number;
   isPr: boolean;
+  perSide: boolean;
   onDone: (setIdx: number) => void;
   rowRef?: (el: HTMLDivElement | null) => void;
 }) {
@@ -200,37 +345,95 @@ function SetRow({
         />
       </div>
 
-      <div className="flex items-stretch gap-2">
-        <label className="min-w-0 flex-1">
-          <span className="label mb-1 block text-center">kg</span>
-          <NumberField
-            noun="peso"
-            context={`la serie ${index + 1}`}
-            value={set.weight}
-            onChange={(v) => patchSet(exIdx, index, { weight: v })}
-            step={weightStep}
-            max={500}
-            decimals={1}
-            placeholder={ref ? String(ref.weight).replace('.', ',') : '0'}
-          />
-        </label>
-        <label className="min-w-0 flex-1">
-          <span className="label mb-1 block text-center">reps</span>
-          <NumberField
-            noun="repeticiones"
-            context={`la serie ${index + 1}`}
-            value={set.reps}
-            onChange={(v) => patchSet(exIdx, index, { reps: v })}
-            step={1}
-            max={100}
-            decimals={0}
-            tone={set.reps > 0 && inRange ? 'accent' : 'default'}
-            placeholder={ref ? String(ref.reps) : String(low)}
-          />
-        </label>
-      </div>
+      {perSide ? (
+        /* Dos filas, una por lado. El brazo malo no se arrastra al bueno: cada
+           uno lleva su peso y sus repeticiones, y el tonelaje suma los dos. */
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="w-7 shrink-0" />
+            <div className="flex min-w-0 flex-1 gap-2">
+              <span className="label min-w-0 flex-1 text-center">kg</span>
+              <span className="label min-w-0 flex-1 text-center">reps</span>
+            </div>
+          </div>
+          {(['izq', 'der'] as const).map((side) => {
+            const entry = side === 'izq' ? { weight: set.weight, reps: set.reps } : set.right;
+            const write = (patch: Partial<SideEntry>) =>
+              side === 'izq'
+                ? patchSet(exIdx, index, { ...patch })
+                : patchSet(exIdx, index, {
+                    right: { weight: set.right?.weight ?? set.weight, reps: set.right?.reps ?? 0, ...patch },
+                  });
+            return (
+              <div key={side} className="flex items-center gap-2">
+                <span className="label w-7 shrink-0">{side}</span>
+                <div className="flex min-w-0 flex-1 items-stretch gap-2">
+                  <NumberField
+                    noun="peso"
+                    context={`el lado ${side === 'izq' ? 'izquierdo' : 'derecho'} de la serie ${index + 1}`}
+                    value={entry?.weight ?? 0}
+                    onChange={(v) => write({ weight: v })}
+                    step={weightStep}
+                    max={500}
+                    decimals={1}
+                    placeholder={ref ? String(ref.weight).replace('.', ',') : '0'}
+                  />
+                  <NumberField
+                    noun="repeticiones"
+                    context={`el lado ${side === 'izq' ? 'izquierdo' : 'derecho'} de la serie ${index + 1}`}
+                    value={entry?.reps ?? 0}
+                    onChange={(v) => write({ reps: v })}
+                    step={1}
+                    max={100}
+                    decimals={0}
+                    tone={(entry?.reps ?? 0) > 0 && (entry as SideEntry | null | undefined)
+                      && (entry!.reps >= low && entry!.reps <= high) ? 'accent' : 'default'}
+                    placeholder={ref ? String(ref.reps) : String(low)}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex items-stretch gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="label mb-1 block text-center">kg</span>
+            <NumberField
+              noun="peso"
+              context={`la serie ${index + 1}`}
+              value={set.weight}
+              onChange={(v) => patchSet(exIdx, index, { weight: v })}
+              step={weightStep}
+              max={500}
+              decimals={1}
+              placeholder={ref ? String(ref.weight).replace('.', ',') : '0'}
+            />
+          </label>
+          <label className="min-w-0 flex-1">
+            <span className="label mb-1 block text-center">reps</span>
+            <NumberField
+              noun="repeticiones"
+              context={`la serie ${index + 1}`}
+              value={set.reps}
+              onChange={(v) => patchSet(exIdx, index, { reps: v })}
+              step={1}
+              max={100}
+              decimals={0}
+              tone={set.reps > 0 && inRange ? 'accent' : 'default'}
+              placeholder={ref ? String(ref.reps) : String(low)}
+            />
+          </label>
+        </div>
+      )}
 
-      <RirPicker value={set.rir} setNumber={index + 1} onPick={(v) => setRir(exIdx, index, v)} />
+      <RirPicker
+        value={set.rir}
+        setNumber={index + 1}
+        onPick={(v) => setRir(exIdx, index, v)}
+        partials={set.partials}
+        onPartials={(v) => setPartials(exIdx, index, v)}
+      />
     </motion.div>
   );
 }
@@ -259,11 +462,14 @@ export function ExerciseCard({
   const complete = doneCount > 0 && doneCount === exercise.sets.length;
   const refLabel = referenceLabel(reference);
   const [low, high] = exercise.repRange;
+  /* Lo que diga el catálogo, salvo que se haya tocado el interruptor a mano:
+     cualquier ejercicio se puede hacer a un brazo un día suelto. */
+  const perSide = exercise.perSide ?? isUnilateral(exercise.exerciseId);
 
   const handleDone = (setIdx: number) => {
     const set = exercise.sets[setIdx];
     if (!set) return;
-    if (set.reps <= 0) {
+    if (setReps(set) <= 0) {
       /* Marcar una serie vacía no confirma nada: se avisa con una vibración
          doble en vez de guardar un cero que ensucie el tonelaje. */
       haptic([14, 60, 14]);
@@ -330,9 +536,15 @@ export function ExerciseCard({
             <AnimatePresence initial={false}>
               {exercise.sets.map((set, i) => (
                 <div key={set.id}>
-                  {/* El descanso medido va justo donde ocurrió: entre la serie
-                      anterior y esta. */}
-                  {i > 0 && set.restSec != null && <RestDivider seconds={set.restSec} />}
+                  {/* El descanso va justo donde ocurrió. Antes de la primera
+                      serie es el de entre ejercicios —el de recoger, andar y
+                      esperar a que se libere la máquina—, que es el que más
+                      varía, así que va rotulado en vez de disimulado. */}
+                  <RestDivider
+                    seconds={set.restSec}
+                    label={i === 0 ? 'entre ejercicios' : undefined}
+                    onChange={(next) => setRest(exIdx, i, next)}
+                  />
                   <SetRow
                     set={set}
                     index={i}
@@ -341,6 +553,7 @@ export function ExerciseCard({
                     reference={reference}
                     weightStep={weightStep}
                     isPr={justPr === set.id}
+                    perSide={perSide}
                     onDone={handleDone}
                     rowRef={registerRow ? (el) => registerRow(exIdx, i, el) : undefined}
                   />
@@ -349,11 +562,26 @@ export function ExerciseCard({
             </AnimatePresence>
           </div>
 
+          <div className="flex items-center justify-between gap-3 px-4 pt-1">
+            <span className="text-micro text-ink-faint">
+              {perSide ? 'Cada lado por separado' : 'Un peso para los dos lados'}
+            </span>
+            <button
+              onClick={() => {
+                haptic(8);
+                setPerSide(exIdx, !perSide);
+              }}
+              aria-pressed={perSide}
+              className="pressable rounded-md px-2 py-1 text-micro font-medium text-accent transition-colors duration-press hover:bg-accent-wash"
+            >
+              {perSide ? 'Apuntar a la vez' : 'Apuntar por lados'}
+            </button>
+          </div>
+
           {/* Quitar afecta a la última serie: es como se piensa («hoy hago una
               menos»), y evita meter una equis en cada fila. */}
           <div className="flex gap-2 px-4 pb-4 pt-2">
             <Button
-              size="sm"
               variant="quiet"
               disabled={exercise.sets.length <= 1}
               onClick={() => {
@@ -368,7 +596,6 @@ export function ExerciseCard({
               Quitar
             </Button>
             <Button
-              size="sm"
               variant="quiet"
               block
               onClick={() => {

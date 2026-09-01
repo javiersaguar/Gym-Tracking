@@ -97,3 +97,43 @@ describe('importar CSV', () => {
     expect(fromCsv('').ok).toBe(false);
   });
 });
+
+describe('lados y parciales en el CSV', () => {
+  it('van y vuelven sin perderse', () => {
+    const conLados: Session = {
+      ...session,
+      exercises: [
+        {
+          ...session.exercises[0]!,
+          sets: [
+            { id: 'a', weight: 20, reps: 10, right: { weight: 18, reps: 9 }, partials: 3, rir: 1, restSec: 120, at: T0, done: true },
+            { id: 'b', weight: 20, reps: 8, rir: 1, restSec: 120, at: T0, done: true },
+          ],
+        },
+      ],
+    };
+    const back = fromCsv(toCsv([conLados]));
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    const sets = back.data.sessions[0]!.exercises[0]!.sets;
+    expect(sets[0]!.right).toEqual({ weight: 18, reps: 9 });
+    expect(sets[0]!.partials).toBe(3);
+    /* La serie normal no se inventa un lado derecho. */
+    expect(sets[1]!.right).toBeUndefined();
+    expect(sets[1]!.partials).toBeNull();
+  });
+
+  it('un CSV sin esas columnas se sigue leyendo', () => {
+    const viejo = [
+      'sesion_id;fecha;hora;dia_indice;dia_nombre;ejercicio_id;ejercicio;musculos;serie;peso_kg;repeticiones;rir;descanso_seg;descanso;tonelaje_kg;sensacion;nota',
+      'a;2026-08-20;18:00;1;Tirón;remo-t;Remo en T;espalda:1;1;40;8;1;120;2:00;320;4;',
+    ].join('\n');
+    const back = fromCsv(viejo);
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    const set = back.data.sessions[0]!.exercises[0]!.sets[0]!;
+    expect(set.weight).toBe(40);
+    expect(set.right).toBeUndefined();
+    expect(set.partials).toBeNull();
+  });
+});

@@ -122,3 +122,71 @@ describe('modo demo', () => {
     expect(storage3.isDemo()).toBe(false);
   });
 });
+
+describe('actualizar la app con un entreno a medias', () => {
+  /* Lo apuntado con la versión anterior no lleva lados, ni parciales, ni el
+     descanso corregido a mano. Al abrir la versión nueva no puede perderse
+     nada de eso: es una sesión en curso, con series ya marcadas. */
+  const viejo = {
+    version: 2,
+    routine: { id: 'ciclo-10', name: 'Ciclo de 10 días', days: [] },
+    sessions: [],
+    active: {
+      id: 'en-curso',
+      dayId: 'd2',
+      dayIndex: 2,
+      dayName: 'Pecho, hombro y tríceps',
+      start: 1000,
+      end: null,
+      exercises: [
+        {
+          exerciseId: 'press-inclinado',
+          name: 'Press inclinado',
+          muscles: [{ muscle: 'pecho', share: 1 }],
+          loadKind: 'peso',
+          repRange: [5, 8],
+          skipped: false,
+          sets: [
+            { id: 'a', weight: 32.5, reps: 6, rir: 1, restSec: 180, at: 1200, done: true },
+            { id: 'b', weight: 32.5, reps: 0, rir: null, restSec: null, at: 0, done: false },
+          ],
+        },
+      ],
+    },
+    seedRefs: {},
+    settings: { weightStep: 2.5, keepAwake: true, backupEvery: 8, lastBackupCount: 0 },
+  };
+
+  it('la sesión en curso y sus series llegan intactas', async () => {
+    disk.setItem(KEY, JSON.stringify(viejo));
+    vi.resetModules();
+    const fresh = await import('./storage');
+    const active = fresh.getStore().active;
+
+    expect(active?.id).toBe('en-curso');
+    expect(active?.dayName).toBe('Pecho, hombro y tríceps');
+    expect(active?.exercises).toHaveLength(1);
+
+    const sets = active?.exercises[0]?.sets ?? [];
+    expect(sets).toHaveLength(2);
+    expect(sets[0]).toMatchObject({ id: 'a', weight: 32.5, reps: 6, rir: 1, restSec: 180, done: true });
+    expect(sets[1]).toMatchObject({ id: 'b', weight: 32.5, reps: 0, done: false });
+    /* Los campos nuevos entran ausentes, no a cero: ausente significa «no se
+       apuntó», y cero significaría «no hizo ninguna». */
+    expect(sets[0]?.right).toBeUndefined();
+    expect(sets[0]?.partials).toBeUndefined();
+  });
+
+  it('lo nuevo se puede apuntar encima sin tocar lo que ya había', async () => {
+    disk.setItem(KEY, JSON.stringify(viejo));
+    vi.resetModules();
+    const fresh = await import('./storage');
+    const actions = await import('./actions');
+
+    actions.setPartials(0, 0, 3);
+    actions.setRest(0, 1, 95);
+    const sets = fresh.getStore().active?.exercises[0]?.sets ?? [];
+    expect(sets[0]).toMatchObject({ weight: 32.5, reps: 6, rir: 1, partials: 3 });
+    expect(sets[1]?.restSec).toBe(95);
+  });
+});
