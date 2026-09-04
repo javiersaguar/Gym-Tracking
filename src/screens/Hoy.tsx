@@ -59,14 +59,28 @@ export function Hoy({
         <p className="mt-3 max-w-md text-body text-ink-muted">
           {active
             ? `${active.dayName}, empezado a las ${new Date(active.start).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.`
-            : day.rest
-              ? `Día ${day.index} del ciclo. Si prefieres entrenar, elige otro día desde la rutina.`
-              : cycle.trainedToday
-                ? /* El ciclo ya ha avanzado: hay que decir que lo de abajo es
-                     lo siguiente, no lo de hoy, o el botón engaña. */
-                  `Lo siguiente es el día ${day.index}: ${day.name.toLowerCase()}.`
+            : cycle.trainedToday
+              ? /* El ciclo ya ha avanzado: hay que decir que lo de abajo es lo
+                   siguiente, no lo de hoy, o el botón engaña. Va antes que el
+                   descanso porque «elige otro día si prefieres entrenar» es un
+                   consejo absurdo para quien acaba de entrenar. */
+                day.rest
+                ? `Lo siguiente es el día ${day.index}: descanso.`
+                : `Lo siguiente es el día ${day.index}: ${day.name.toLowerCase()}.`
+              : day.rest
+                ? `Día ${day.index} del ciclo. Si prefieres entrenar, elige otro día desde la rutina.`
                 : `Día ${day.index} del ciclo: ${day.name.toLowerCase()}.`}
         </p>
+
+        {/* Al volver de un parón, el ciclo sigue donde lo dejaste. Conviene
+            decirlo: si no, ver el mismo día de hace dos semanas parece que la
+            app se ha quedado colgada, en vez de que te ha esperado. */}
+        {!active && !cycle.trainedToday && (cycle.daysSinceLast ?? 0) >= 3 && (
+          <p className="mt-2 text-caption text-ink-faint">
+            Hace {plural(cycle.daysSinceLast as number, 'día')} que no entrenas. El ciclo te ha esperado
+            aquí: no has perdido ninguna sesión.
+          </p>
+        )}
 
         <div className="mt-6 flex gap-2">
           {active ? (

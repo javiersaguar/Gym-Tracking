@@ -45,9 +45,20 @@ export type CycleState = {
 };
 
 /**
- * Qué toca hoy. Se calcula, no se guarda: el ciclo avanza un día por cada día
- * de calendario transcurrido desde el último entreno, así que si te saltas
- * tres días no te quedas eternamente atascado en el día 4.
+ * Qué toca hoy. Se calcula, no se guarda en ninguna parte.
+ *
+ * El ciclo arranca donde lo dejaste —el día de tu última sesión— y avanza uno.
+ * A partir de ahí, cada día de calendario de más solo sirve para **gastar días
+ * de descanso**: en cuanto llega a un día de entreno, el ciclo se para y te
+ * espera ahí, den igual los días que pasen.
+ *
+ * Esto es lo que hace que un viaje o una semana de exámenes no te salten
+ * entrenos. La versión anterior avanzaba una posición por día natural, así que
+ * volver después de cinco días te colocaba cinco días más allá y te habías
+ * perdido cuatro sesiones sin hacerlas.
+ *
+ * El descanso, en cambio, sí pasa solo: es un día del calendario, no una tarea
+ * pendiente, y no tendría sentido tener que marcarlo.
  */
 export function cycleState(store: Store, now = Date.now()): CycleState {
   const days = store.routine.days;
@@ -58,10 +69,20 @@ export function cycleState(store: Store, now = Date.now()): CycleState {
   const elapsed = daysBetween(last.start, now);
   const pos = days.findIndex((d) => d.id === last.dayId);
   const from = pos >= 0 ? pos : 0;
-  const step = Math.max(1, elapsed);
-  const day = days[(from + step) % days.length] as Day;
 
-  return { day, trainedToday: elapsed === 0, lastSession: last, daysSinceLast: elapsed };
+  /* Del día que acabas de entrenar siempre se sale: lo hiciste. */
+  let i = (from + 1) % days.length;
+  let budget = Math.max(1, elapsed) - 1;
+
+  /* Y cada día de más se come un descanso, nunca un entreno. El tope de
+     vueltas es por si alguien deja una rutina entera de días libres: sin él,
+     un año sin aparecer daría trescientas sesenta y cinco vueltas en balde. */
+  for (let guard = 0; guard < days.length && budget > 0 && (days[i] as Day).rest; guard++) {
+    i = (i + 1) % days.length;
+    budget -= 1;
+  }
+
+  return { day: days[i] as Day, trainedToday: elapsed === 0, lastSession: last, daysSinceLast: elapsed };
 }
 
 /* ── Sesión ──────────────────────────────────────────────────────────────── */

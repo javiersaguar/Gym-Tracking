@@ -64,6 +64,19 @@ no hay servidor, ni cuenta, ni red que se pueda caer a mitad de una serie.
 - **Registro completo.** Cada entreno desplegable serie a serie: ejercicio, peso, repeticiones, RIR y
   el descanso que precedió a cada una. Exportable a CSV.
 
+## Cómo avanza el ciclo
+
+El día que toca no se guarda: se calcula. El ciclo arranca donde lo dejaste —el día de tu última
+sesión— y avanza uno. A partir de ahí, **cada día de calendario de más solo sirve para gastar días de
+descanso**: en cuanto llega a un día de entreno, se para y te espera ahí, den igual los días que pasen.
+
+Así, el descanso pasa solo —es un día del calendario, no una tarea pendiente, y no tendría sentido
+tener que marcarlo—, pero un viaje o una semana de exámenes no te saltan entrenos: al volver sigues
+donde estabas y la pantalla de Hoy te lo dice para que no parezca que la app se ha quedado colgada.
+
+La posición se re-ancla siempre al día que **entrenas**, no a una cuenta interna: si eliges el día 5 a
+mano, mañana toca el 6.
+
 ## Cómo se mide el progreso cuando los descansos no son uniformes
 
 Este es el problema de fondo de la app. En un gimnasio lleno el descanso lo decide la cola de la
@@ -169,7 +182,7 @@ una copia descargable en JSON y su restauración.
 ```bash
 npm install
 npm run dev        # servidor de desarrollo
-npm test           # 160 pruebas: algoritmo, porciones, malla del cuerpo, demo y lados
+npm test           # 164 pruebas: algoritmo, porciones, malla del cuerpo, demo, lados y ciclo
 npm run build      # build de producción + service worker
 npm run preview    # sirve el build, con el modo sin conexión activo
 npm run icons      # regenera los PNG del icono a partir de public/icon.svg

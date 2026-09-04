@@ -149,14 +149,43 @@ describe('posición en el ciclo', () => {
     expect(c.trainedToday).toBe(true);
   });
 
-  it('avanza un día de ciclo por cada día de calendario perdido', () => {
-    /* Tres días sin aparecer desde el día 1 dejan el ciclo en el 4, que es
-       descanso: la app no se queda clavada esperando al día 2. */
-    const s = store({ sessions: [{ ...session('a', T0, []), dayId: 'd1', dayIndex: 1 }] });
-    const c = cycleState(s, T0 + 3 * DAY);
+  it('el día de descanso pasa solo, sin marcar nada', () => {
+    /* Entrenado el día 3, al día siguiente toca el 4, que es descanso. */
+    const s = store({ sessions: [{ ...session('a', T0, []), dayId: 'd3', dayIndex: 3 }] });
+    const c = cycleState(s, T0 + DAY);
     expect(c.day.index).toBe(4);
     expect(c.day.rest).toBe(true);
-    expect(c.daysSinceLast).toBe(3);
+  });
+
+  it('pasado el descanso, sigue el entreno siguiente', () => {
+    const s = store({ sessions: [{ ...session('a', T0, []), dayId: 'd3', dayIndex: 3 }] });
+    expect(cycleState(s, T0 + 2 * DAY).day.index).toBe(5);
+  });
+
+  it('un parón largo no salta entrenos: el ciclo espera', () => {
+    /* Es el caso de un viaje o una semana de exámenes. Después del día 3 solo
+       hay un descanso por medio, así que por muchos días que pasen el ciclo se
+       queda esperando en el día 5 y no se pierde ninguna sesión. */
+    const s = store({ sessions: [{ ...session('a', T0, []), dayId: 'd3', dayIndex: 3 }] });
+    for (const dias of [3, 7, 14, 40]) {
+      const c = cycleState(s, T0 + dias * DAY);
+      expect(c.day.index, `tras ${dias} días`).toBe(5);
+      expect(c.daysSinceLast).toBe(dias);
+    }
+  });
+
+  it('los días de descanso solo se gastan de uno en uno', () => {
+    /* Del día 9 al 1 hay un descanso (el 10) en medio. Un solo día de
+       calendario no puede cruzarlo y quedarse además en el 1. */
+    const s = store({ sessions: [{ ...session('a', T0, []), dayId: 'd9', dayIndex: 9 }] });
+    expect(cycleState(s, T0 + DAY).day.index).toBe(10);
+    expect(cycleState(s, T0 + DAY).day.rest).toBe(true);
+  });
+
+  it('la posición se re-ancla al día que entrenes, no a una cuenta interna', () => {
+    /* Si eliges el día 5 a mano, mañana toca el 6. */
+    const s = store({ sessions: [{ ...session('a', T0, []), dayId: 'd5', dayIndex: 5 }] });
+    expect(cycleState(s, T0 + DAY).day.index).toBe(6);
   });
 
   it('da la vuelta al final del ciclo', () => {

@@ -93,8 +93,13 @@ export function Portada({
         <p className="mt-5 max-w-sm text-body text-ink-muted" style={{ '--i': 2 } as React.CSSProperties}>
           {active
             ? `Entreno en curso desde las ${new Date(active.start).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. Te quedan ${plural(pendingSets(store), 'serie')} por marcar.`
-            : day.rest
-              ? `Día ${day.index} del ciclo. Si prefieres entrenar, elige otro día desde la rutina.`
+            : cycle.trainedToday
+              ? /* El titular grande es el día siguiente, no el de hoy: sin
+                   decirlo, un «Descanso» enorme justo después de entrenar se
+                   lee como si hoy tocara descansar. */
+                `Ya has entrenado hoy. Lo siguiente es el día ${day.index}${day.rest ? ': descanso' : ''}.`
+              : day.rest
+                ? `Día ${day.index} del ciclo. Si prefieres entrenar, elige otro día desde la rutina.`
               : `Día ${day.index} del ciclo · ${plural(day.exercises.length, 'ejercicio')} · ${plural(
                   day.exercises.reduce((a, e) => a + e.plannedSets, 0),
                   'serie',
